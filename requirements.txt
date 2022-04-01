@@ -1,0 +1,14 @@
+scikit-learn
+pandas
+matplotlib
+seaborn
+autopep8
+flake8
+jupyterlab
+notebook
+ipykernel
+squarify
+pyod
+openpyxl
+
+# python -m ipykernel install --user --name=myenv
