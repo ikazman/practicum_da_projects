@@ -11,6 +11,7 @@ class MetricCalculator:
         self.visits = pd.read_csv(visits, parse_dates=['Session Start'])
         self.orders = pd.read_csv(orders, parse_dates=['Event Dt'])
         self.costs = pd.read_csv(costs, parse_dates=['dt'])
+        self.profiles = None
 
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
@@ -24,14 +25,15 @@ class MetricCalculator:
 
         self.visits.rename(columns={'user id': 'user_id',
                                     'session start': 'session_start',
-                                    'session end': 'session_end'}, 
-                                    inplace=True)
+                                    'session end': 'session_end'},
+                           inplace=True)
 
         self.orders.rename(columns={'user id': 'user_id',
                                     'event dt': 'event_dt'},
-                                    inplace=True)
+                           inplace=True)
 
-    def group_by_dimensions(self, df, dims, horizon, aggfunc, cumsum=False):
+    def group_by_dimensions(self, df, dims, horizon,
+                            aggfunc='nunique', cumsum=False):
         """Группировка таблицы по желаемым признакам."""
 
         result = df.pivot_table(
@@ -44,10 +46,12 @@ class MetricCalculator:
         result = result.div(result['cohort_size'], axis=0)
         result = result[['cohort_size'] + list(range(horizon))]
         result['cohort_size'] = cohort_sizes
+        return result
 
     def get_profiles(self):
         """Cоздаем пользовательские профили."""
 
+        ad_costs = self.costs.copy()
         # находим параметры первых посещений
         profiles = (self.visits
                     .sort_values(by=['user_id', 'session_start'])
@@ -75,16 +79,15 @@ class MetricCalculator:
                      .reset_index())
 
         # объединяем траты на рекламу и число привлечённых пользователей
-        self.costs = self.costs.merge(
-            new_users, on=['dt', 'channel'], how='left')
+        ad_costs = ad_costs.merge(new_users, on=['dt', 'channel'], how='left')
 
         # делим рекламные расходы на число привлечённых пользователей
-        self.costs['acquisition_cost'] = (
-            self.costs['costs'] / self.costs['unique_users'])
+        ad_costs['acquisition_cost'] = (
+            ad_costs['costs'] / ad_costs['unique_users'])
 
         # добавляем стоимость привлечения в профили
         profiles = profiles.merge(
-            self.costs[['dt', 'channel', 'acquisition_cost']],
+            ad_costs[['dt', 'channel', 'acquisition_cost']],
             on=['dt', 'channel'],
             how='left')
 
@@ -92,3 +95,38 @@ class MetricCalculator:
         profiles['acquisition_cost'] = profiles['acquisition_cost'].fillna(0)
 
         return profiles
+
+    def get_retention(self, profiles, observation_date, horizon,
+                      dimensions=[], ignore_horizon=False):
+        """Функция для расчёта удержания"""
+
+        # добавляем столбец payer в передаваемый dimensions список
+        dimensions = ['payer'] + dimensions
+
+        # исключаем пользователей, не «доживших» до горизонта анализа
+        suitable_acquisition_date = observation_date
+        if not ignore_horizon:
+            suitable_acquisition_date = (
+                observation_date - timedelta(days=horizon - 1))
+
+        result_raw = profiles.query('dt <= @suitable_acquisition_date')
+
+        # собираем «сырые» данные для расчёта удержания
+        result_raw = result_raw.merge(
+            self.visits[['user_id', 'session_start']],
+            on='user_id', how='left')
+
+        result_raw['lifetime'] = (
+            result_raw['session_start'] - result_raw['first_ts']
+        ).dt.days
+
+        # получаем таблицу удержания
+        result_grouped = self.group_by_dimensions(
+            result_raw, dimensions, horizon)
+
+        # получаем таблицу динамики удержания
+        result_in_time = self.group_by_dimensions(
+            result_raw, dimensions + ['dt'], horizon)
+
+        # возвращаем обе таблицы и сырые данные
+        return result_raw, result_grouped, result_in_time
