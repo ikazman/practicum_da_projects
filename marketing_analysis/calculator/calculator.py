@@ -12,8 +12,28 @@ class MetricCalculator:
         self.orders = pd.read_csv(orders, parse_dates=['Event Dt'])
         self.costs = pd.read_csv(costs, parse_dates=['dt'])
 
-    def group_by_dimensions(self, df, dims, horizon_days, aggfunc, cumsum=False):
+    def columns_fixer(self):
+        """Приводим колонки к одному регистру, переименовываем по
+        необходимости, конвертируем формат."""
+
+        self.visits.columns = self.visits.columns.str.lower()
+        self.orders.columns = self.orders.columns.str.lower()
+        self.costs.columns = self.costs.columns.str.lower()
+
+        self.costs['dt'] = self.costs['dt'].dt.date
+
+        self.visits.rename(columns={'user id': 'user_id',
+                                    'session start': 'session_start',
+                                    'session end': 'session_end'}, 
+                                    inplace=True)
+
+        self.orders.rename(columns={'user id': 'user_id',
+                                    'event dt': 'event_dt'},
+                                    inplace=True)
+
+    def group_by_dimensions(self, df, dims, horizon, aggfunc, cumsum=False):
         """Группировка таблицы по желаемым признакам."""
+
         result = df.pivot_table(
             index=dims, columns='lifetime', values='user_id', aggfunc=aggfunc)
         if cumsum:
@@ -22,10 +42,10 @@ class MetricCalculator:
             columns={'user_id': 'cohort_size'}))
         result = cohort_sizes.merge(result, on=dims, how='left').fillna(0)
         result = result.div(result['cohort_size'], axis=0)
-        result = result[['cohort_size'] + list(range(horizon_days))]
+        result = result[['cohort_size'] + list(range(horizon))]
         result['cohort_size'] = cohort_sizes
 
-    def get_profiles(self, ad_costs):
+    def get_profiles(self):
         """Cоздаем пользовательские профили."""
 
         # находим параметры первых посещений
@@ -49,12 +69,10 @@ class MetricCalculator:
 
         # считаем количество уникальных пользователей
         # с одинаковыми источником и датой привлечения
-        new_users = (
-            profiles.groupby(['dt', 'channel'])
-            .agg({'user_id': 'nunique'})
-            .rename(columns={'user_id': 'unique_users'})
-            .reset_index()
-        )
+        new_users = (profiles.groupby(['dt', 'channel'])
+                     .agg({'user_id': 'nunique'})
+                     .rename(columns={'user_id': 'unique_users'})
+                     .reset_index())
 
         # объединяем траты на рекламу и число привлечённых пользователей
         self.costs = self.costs.merge(
@@ -66,10 +84,9 @@ class MetricCalculator:
 
         # добавляем стоимость привлечения в профили
         profiles = profiles.merge(
-            ad_costs[['dt', 'channel', 'acquisition_cost']],
+            self.costs[['dt', 'channel', 'acquisition_cost']],
             on=['dt', 'channel'],
-            how='left',
-        )
+            how='left')
 
         # стоимость привлечения органических пользователей равна нулю
         profiles['acquisition_cost'] = profiles['acquisition_cost'].fillna(0)
