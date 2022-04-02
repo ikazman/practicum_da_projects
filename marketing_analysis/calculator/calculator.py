@@ -89,10 +89,25 @@ class MetricCalculator:
         # возвращаем таблицы LTV и ROI
         return roi
 
+    def lifetime_calculation(self, df, to_merge, columns_to_merge, last_date):
+        """добавляем данные о покупках и рассчитываем лайфтайм пользователя для
+        каждой покупки."""
+
+        df = df.merge(to_merge[columns_to_merge], on='user_id', how='left')
+        df['lifetime'] = (df[last_date] - df['first_ts']).dt.days
+        return df
+
+    def dimensions_check(self, df, dims):
+        if len(dims) == 0:
+            df['cohort'] = 'All users'
+            dims = dims + ['cohort']
+        return df, dims
+
     def get_profiles(self):
         """Cоздаем пользовательские профили."""
 
         ad_costs = self.costs.copy()
+
         # находим параметры первых посещений
         profiles = (self.visits
                     .sort_values(by=['user_id', 'session_start'])
@@ -149,13 +164,9 @@ class MetricCalculator:
                                             horizon, ignore_horizon)
 
         # собираем «сырые» данные для расчёта удержания
-        result_raw = result_raw.merge(
-            self.visits[['user_id', 'session_start']],
-            on='user_id', how='left')
-
-        result_raw['lifetime'] = (
-            result_raw['session_start'] - result_raw['first_ts']
-        ).dt.days
+        result_raw = self.lifetime_calculation(result_raw, self.visits,
+                                               ['user_id', 'session_start'],
+                                               'session_start')
 
         # получаем таблицу удержания
         result_grouped = self.group_by_dimensions(result_raw,
@@ -167,7 +178,7 @@ class MetricCalculator:
                                                   dimensions + ['dt'],
                                                   horizon)
 
-        # возвращаем обе таблицы и сырые данные
+        # сырые данные, таблица RR, таблица динамики RR
         return result_raw, result_grouped, result_in_time
 
     def get_conversion(self, profiles, observation_date, horizon,
@@ -185,18 +196,12 @@ class MetricCalculator:
                            .reset_index())
 
         # добавляем данные о покупках в профили
-        result_raw = result_raw.merge(
-            first_purchases[['user_id', 'event_dt']], on='user_id', how='left')
-
-        # рассчитываем лайфтайм для каждой покупки
-        result_raw['lifetime'] = (
-            result_raw['event_dt'] - result_raw['first_ts']
-        ).dt.days
+        result_raw = self.lifetime_calculation(result_raw, first_purchases,
+                                               ['user_id', 'event_dt'],
+                                               'event_dt')
 
         # группируем по cohort, если в dimensions ничего нет
-        if len(dimensions) == 0:
-            result_raw['cohort'] = 'All users'
-            dimensions += ['cohort']
+        result_raw, dimensions = self.dimensions_check(result_raw, dimensions)
 
         # получаем таблицу конверсии
         result_grouped = self.group_by_dimensions(result_raw,
@@ -212,10 +217,11 @@ class MetricCalculator:
                                                   dimensions + ['dt'],
                                                   horizon)
 
-        # возвращаем обе таблицы и сырые данные
+        # сырые данные, таблица CR, таблица динамики CR
         return result_raw, result_grouped, result_in_time
 
-    def get_ltv(self, profiles, observation_date, horizon, dimensions=[], ignore_horizon=False):
+    def get_ltv(self, profiles, observation_date, horizon,
+                dimensions=[], ignore_horizon=False):
         """Функция для расчёта LTV и ROI"""
 
         # исключаем пользователей, не «доживших» до горизонта анализа
@@ -223,18 +229,13 @@ class MetricCalculator:
                                             horizon, ignore_horizon)
 
         # добавляем данные о покупках в профили
-        result_raw = result_raw.merge(
-            self.orders[['user_id', 'event_dt', 'revenue']], on='user_id', how='left'
-        )
-        # рассчитываем лайфтайм пользователя для каждой покупки
-        result_raw['lifetime'] = (
-            result_raw['event_dt'] - result_raw['first_ts']
-        ).dt.days
+        to_merge_columns = ['user_id', 'event_dt', 'revenue']
+        result_raw = self.lifetime_calculation(result_raw, self.orders,
+                                               to_merge_columns,
+                                               'event_dt')
 
         # группируем по cohort, если в dimensions ничего нет
-        if len(dimensions) == 0:
-            result_raw['cohort'] = 'All users'
-            dimensions = dimensions + ['cohort']
+        result_raw, dimensions = self.dimensions_check(result_raw, dimensions)
 
         # получаем таблицы LTV и ROI
         result_grouped = self.group_by_dimensions(result_raw,
@@ -242,10 +243,10 @@ class MetricCalculator:
                                                   horizon,
                                                   aggfunc='sum',
                                                   cumsum=True)
-        roi_grouped = self.cac_roi(result_raw,
-                                   result_grouped,
-                                   dimensions,
-                                   horizon)
+        roi = self.cac_roi(result_raw,
+                           result_grouped,
+                           dimensions,
+                           horizon)
 
         # для таблиц динамики убираем 'cohort' из dimensions
         if 'cohort' in dimensions:
@@ -261,10 +262,5 @@ class MetricCalculator:
                                    result_in_time, dimensions + ['dt'],
                                    horizon)
 
-        return (
-            result_raw,  # сырые данные
-            result_grouped,  # таблица LTV
-            result_in_time,  # таблица динамики LTV
-            roi_grouped,  # таблица ROI
-            roi_in_time,  # таблица динамики ROI
-        )
+        # сырые данные, таблица LTV, динамика LTV, ROI, динамика ROI
+        return result_raw, result_grouped, result_in_time, roi, roi_in_time
