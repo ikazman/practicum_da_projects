@@ -32,6 +32,16 @@ class MetricCalculator:
                                     'event dt': 'event_dt'},
                            inplace=True)
 
+    def acquisitions_date(self, profiles, observation,
+                          horizon, ignore_horizon):
+        """Исключаем пользователей, не «доживших» до горизонта анализа"""
+
+        if ignore_horizon:
+            acquisition_date = observation
+        acquisition_date = observation - timedelta(days=horizon - 1)
+        result_raw = profiles.query('dt <= @acquisition_date')
+        return result_raw
+
     def group_by_dimensions(self, df, dims, horizon,
                             aggfunc='nunique', cumsum=False):
         """Группировка таблицы по желаемым признакам."""
@@ -98,18 +108,14 @@ class MetricCalculator:
 
     def get_retention(self, profiles, observation_date, horizon,
                       dimensions=[], ignore_horizon=False):
-        """Функция для расчёта удержания"""
+        """Функция для расчёта удержания."""
 
         # добавляем столбец payer в передаваемый dimensions список
         dimensions = ['payer'] + dimensions
 
         # исключаем пользователей, не «доживших» до горизонта анализа
-        suitable_acquisition_date = observation_date
-        if not ignore_horizon:
-            suitable_acquisition_date = (
-                observation_date - timedelta(days=horizon - 1))
-
-        result_raw = profiles.query('dt <= @suitable_acquisition_date')
+        result_raw = self.acquisitions_date(profiles, observation_date,
+                                            horizon, ignore_horizon)
 
         # собираем «сырые» данные для расчёта удержания
         result_raw = result_raw.merge(
@@ -121,12 +127,59 @@ class MetricCalculator:
         ).dt.days
 
         # получаем таблицу удержания
-        result_grouped = self.group_by_dimensions(
-            result_raw, dimensions, horizon)
+        result_grouped = self.group_by_dimensions(result_raw,
+                                                  dimensions,
+                                                  horizon)
 
         # получаем таблицу динамики удержания
-        result_in_time = self.group_by_dimensions(
-            result_raw, dimensions + ['dt'], horizon)
+        result_in_time = self.group_by_dimensions(result_raw,
+                                                  dimensions + ['dt'],
+                                                  horizon)
+
+        # возвращаем обе таблицы и сырые данные
+        return result_raw, result_grouped, result_in_time
+
+    def get_conversion(self, profiles, observation_date, horizon,
+                       dimensions=[], ignore_horizon=False):
+        """Функция для расчёта удержания"""
+
+        # исключаем пользователей, не «доживших» до горизонта анализа
+        result_raw = self.acquisitions_date(profiles, observation_date,
+                                            horizon, ignore_horizon)
+
+        # определяем дату и время первой покупки для каждого пользователя
+        first_purchases = (self.orders.sort_values(by=['user_id', 'event_dt'])
+                           .groupby('user_id')
+                           .agg({'event_dt': 'first'})
+                           .reset_index())
+
+        # добавляем данные о покупках в профили
+        result_raw = result_raw.merge(
+            first_purchases[['user_id', 'event_dt']], on='user_id', how='left')
+
+        # рассчитываем лайфтайм для каждой покупки
+        result_raw['lifetime'] = (
+            result_raw['event_dt'] - result_raw['first_ts']
+        ).dt.days
+
+        # группируем по cohort, если в dimensions ничего нет
+        if len(dimensions) == 0:
+            result_raw['cohort'] = 'All users'
+            dimensions += ['cohort']
+
+        # получаем таблицу конверсии
+        result_grouped = self.group_by_dimensions(result_raw,
+                                                  dimensions,
+                                                  horizon)
+
+        # для таблицы динамики конверсии убираем 'cohort' из dimensions
+        if 'cohort' in dimensions:
+            dimensions = []
+
+        # получаем таблицу динамики конверсии
+        result_in_time = self.group_by_dimensions(result_raw,
+                                                  dimensions + ['dt'],
+                                                  horizon)
 
         # возвращаем обе таблицы и сырые данные
         return result_raw, result_grouped, result_in_time
