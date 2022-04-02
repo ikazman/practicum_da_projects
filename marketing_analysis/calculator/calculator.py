@@ -58,6 +58,37 @@ class MetricCalculator:
         result['cohort_size'] = cohort_sizes
         return result
 
+    def cac_roi(self, df, grouped_df, dims, horizon):
+        """Считаем CAC и ROI на треуголной таблице"""
+
+        # датафрейм с данными пользователей CAC, добавляем dimensions
+        cac = df[['user_id', 'acquisition_cost'] + dims].drop_duplicates()
+
+        # считаем средний CAC по параметрам из dimensions
+        cac = (cac.groupby(dims)
+               .agg({'acquisition_cost': 'mean'})
+               .rename(columns={'acquisition_cost': 'cac'}))
+
+        # считаем ROI: делим LTV на CAC
+        roi = grouped_df.div(cac['cac'], axis=0)
+
+        # удаляем строки с бесконечным ROI
+        roi = roi[~roi['cohort_size'].isin([np.inf])]
+        cohort_sizes = (df.groupby(dims).agg({'user_id': 'nunique'}).rename(
+            columns={'user_id': 'cohort_size'}))
+        # восстанавливаем размеры когорт в таблице ROI
+        roi['cohort_size'] = cohort_sizes
+
+        # добавляем CAC в таблицу ROI
+        roi['cac'] = cac['cac']
+
+        # в финальной таблице оставляем размеры когорт, CAC
+        # и ROI в лайфтаймы, не превышающие горизонт анализа
+        roi = roi[['cohort_size', 'cac'] + list(range(horizon))]
+
+        # возвращаем таблицы LTV и ROI
+        return roi
+
     def get_profiles(self):
         """Cоздаем пользовательские профили."""
 
@@ -183,3 +214,57 @@ class MetricCalculator:
 
         # возвращаем обе таблицы и сырые данные
         return result_raw, result_grouped, result_in_time
+
+    def get_ltv(self, profiles, observation_date, horizon, dimensions=[], ignore_horizon=False):
+        """Функция для расчёта LTV и ROI"""
+
+        # исключаем пользователей, не «доживших» до горизонта анализа
+        result_raw = self.acquisitions_date(profiles, observation_date,
+                                            horizon, ignore_horizon)
+
+        # добавляем данные о покупках в профили
+        result_raw = result_raw.merge(
+            self.orders[['user_id', 'event_dt', 'revenue']], on='user_id', how='left'
+        )
+        # рассчитываем лайфтайм пользователя для каждой покупки
+        result_raw['lifetime'] = (
+            result_raw['event_dt'] - result_raw['first_ts']
+        ).dt.days
+
+        # группируем по cohort, если в dimensions ничего нет
+        if len(dimensions) == 0:
+            result_raw['cohort'] = 'All users'
+            dimensions = dimensions + ['cohort']
+
+        # получаем таблицы LTV и ROI
+        result_grouped = self.group_by_dimensions(result_raw,
+                                                  dimensions,
+                                                  horizon,
+                                                  aggfunc='sum',
+                                                  cumsum=True)
+        roi_grouped = self.cac_roi(result_raw,
+                                   result_grouped,
+                                   dimensions,
+                                   horizon)
+
+        # для таблиц динамики убираем 'cohort' из dimensions
+        if 'cohort' in dimensions:
+            dimensions = []
+
+        # получаем таблицы динамики LTV и ROI
+        result_in_time = self.group_by_dimensions(result_raw,
+                                                  dimensions + ['dt'],
+                                                  horizon,
+                                                  aggfunc='sum',
+                                                  cumsum=True)
+        roi_in_time = self.cac_roi(result_raw,
+                                   result_in_time, dimensions + ['dt'],
+                                   horizon)
+
+        return (
+            result_raw,  # сырые данные
+            result_grouped,  # таблица LTV
+            result_in_time,  # таблица динамики LTV
+            roi_grouped,  # таблица ROI
+            roi_in_time,  # таблица динамики ROI
+        )
