@@ -33,7 +33,7 @@ class MetricCalculator:
 
     def acquisitions_date(self, profiles, observation,
                           horizon, ignore_horizon):
-        """Исключаем пользователей, не «доживших» до горизонта анализа"""
+        """Исключаем пользователей, не «доживших» до горизонта анализа."""
         if ignore_horizon:
             acquisition_date = observation
         acquisition_date = observation - timedelta(days=horizon - 1)
@@ -56,7 +56,7 @@ class MetricCalculator:
         return result
 
     def cac_roi(self, df, grouped_df, dims, horizon):
-        """Считаем CAC и ROI на треуголной таблице"""
+        """Считаем CAC и ROI на треуголной таблице."""
 
         # датафрейм с данными пользователей CAC, добавляем dimensions
         cac = df[['user_id', 'acquisition_cost'] + dims].drop_duplicates()
@@ -87,23 +87,23 @@ class MetricCalculator:
         return roi
 
     def lifetime_calculation(self, df, to_merge, columns_to_merge, last_date):
-        """добавляем данные о покупках и рассчитываем лайфтайм пользователя для
+        """Добавляем данные о покупках и рассчитываем лайфтайм пользователя для
         каждой покупки."""
         df = df.merge(to_merge[columns_to_merge], on='user_id', how='left')
         df['lifetime'] = (df[last_date] - df['first_ts']).dt.days
         return df
 
     def dimensions_check(self, df, dims):
-        """Функция для группировки по коготам если в dims пусто"""
+        """Функция для группировки по коготам если в dims пусто."""
         if len(dims) == 0:
             df['cohort'] = 'All users'
             dims = dims + ['cohort']
         return df, dims
 
-    def filter_data(df, window):
+    def filter_data(self, df, window):
         """Функция для сглаживания фрейма: применяем скользящее среднее."""
         for column in df.columns.values:
-            df[column] = df[column].rolling(window).mean() 
+            df[column] = df[column].rolling(window).mean()
         return df
 
     def get_profiles(self):
@@ -185,7 +185,7 @@ class MetricCalculator:
 
     def get_conversion(self, profiles, observation_date, horizon,
                        dimensions=[], ignore_horizon=False):
-        """Функция для расчёта удержания"""
+        """Функция для расчёта конверсии."""
 
         # исключаем пользователей, не «доживших» до горизонта анализа
         result_raw = self.acquisitions_date(profiles, observation_date,
@@ -224,7 +224,7 @@ class MetricCalculator:
 
     def get_ltv(self, profiles, observation_date, horizon,
                 dimensions=[], ignore_horizon=False):
-        """Функция для расчёта LTV и ROI"""
+        """Функция для расчёта LTV и ROI."""
 
         # исключаем пользователей, не «доживших» до горизонта анализа
         result_raw = self.acquisitions_date(profiles, observation_date,
@@ -266,3 +266,65 @@ class MetricCalculator:
 
         # сырые данные, таблица LTV, динамика LTV, ROI, динамика ROI
         return result_raw, result_grouped, result_in_time, roi, roi_in_time
+
+    def plot_retention(self, retention, retention_history, horizon, window=7):
+        """Функция для визуализации удержания."""
+        plt.figure(figsize=(15, 10))
+
+        retention = retention.drop(columns=['cohort_size', 0])
+        retention_history = retention_history.drop(
+            columns=['cohort_size'])[[horizon - 1]]
+
+        # если в индексах таблицы удержания только payer,
+        # добавляем второй признак — cohort
+        if retention.index.nlevels == 1:
+            retention['cohort'] = 'All users'
+            retention = retention.reset_index().set_index(['cohort', 'payer'])
+
+        # в таблице графиков — два столбца и две строки, четыре ячейки
+        # в первой строим кривые удержания платящих пользователей
+        ax1 = plt.subplot(2, 2, 1)
+        retention.query('payer == True').droplevel('payer').T.plot(
+            grid=True, ax=ax1)
+        plt.legend()
+        plt.xlabel('Лайфтайм')
+        plt.title('Удержание платящих пользователей')
+
+        # во второй ячейке строим кривые удержания неплатящих
+        # вертикальная ось — от графика из первой ячейки
+        ax2 = plt.subplot(2, 2, 2, sharey=ax1)
+        retention.query('payer == False').droplevel('payer').T.plot(
+            grid=True, ax=ax2)
+        plt.legend()
+        plt.xlabel('Лайфтайм')
+        plt.title('Удержание неплатящих пользователей')
+
+        # в третьей ячейке — динамика удержания платящих
+        ax3 = plt.subplot(2, 2, 3)
+        # получаем названия столбцов для сводной таблицы
+        columns = [
+            name
+            for name in retention_history.index.names
+            if name not in ['dt', 'payer']
+        ]
+        # фильтруем данные и строим график
+        filtered_data = retention_history.query('payer == True').pivot_table(
+            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
+        self.filter_data(filtered_data, window).plot(grid=True, ax=ax3)
+        plt.xlabel('Дата привлечения')
+        plt.title('Динамика удержания платящих'
+                  f'пользователей на {horizon}-й день')
+
+        # в чётвертой ячейке — динамика удержания неплатящих
+        ax4 = plt.subplot(2, 2, 4, sharey=ax3)
+        # фильтруем данные и строим график
+        filtered_data = retention_history.query('payer == False').pivot_table(
+            index='dt', columns=columns, values=horizon - 1, aggfunc='mean'
+        )
+        self.filter_data(filtered_data, window).plot(grid=True, ax=ax4)
+        plt.xlabel('Дата привлечения')
+        plt.title('Динамика удержания неплатящих'
+                  f'пользователей на {horizon}-й день')
+
+        plt.tight_layout()
+        plt.show()
