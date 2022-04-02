@@ -37,18 +37,21 @@ class MetricCalculator:
         if ignore_horizon:
             acquisition_date = observation
         acquisition_date = observation - timedelta(days=horizon - 1)
-        result_raw = profiles.query('dt <= @acquisition_date')
-        return result_raw
+        raw_data = profiles.query('dt <= @acquisition_date')
+        return raw_data
 
     def group_by_dimensions(self, df, dims, horizon,
                             aggfunc='nunique', cumsum=False):
         """Группировка таблицы по желаемым признакам."""
-        result = df.pivot_table(
-            index=dims, columns='lifetime', values='user_id', aggfunc=aggfunc)
+        result = df.pivot_table(index=dims, columns='lifetime',
+                                values='user_id', aggfunc=aggfunc)
+
         if cumsum:
             result = result.fillna(0).cumsum(axis=1)
-        cohort_sizes = (df.groupby(dims).agg({'user_id': 'nunique'}).rename(
-            columns={'user_id': 'cohort_size'}))
+
+        cohort_sizes = (df.groupby(dims)
+                        .agg({'user_id': 'nunique'})
+                        .rename(columns={'user_id': 'cohort_size'}))
         result = cohort_sizes.merge(result, on=dims, how='left').fillna(0)
         result = result.div(result['cohort_size'], axis=0)
         result = result[['cohort_size'] + list(range(horizon))]
@@ -162,34 +165,34 @@ class MetricCalculator:
         dimensions = ['payer'] + dimensions
 
         # исключаем пользователей, не «доживших» до горизонта анализа
-        result_raw = self.acquisitions_date(profiles, observation_date,
-                                            horizon, ignore_horizon)
+        retention_raw = self.acquisitions_date(profiles, observation_date,
+                                               horizon, ignore_horizon)
 
         # собираем «сырые» данные для расчёта удержания
-        result_raw = self.lifetime_calculation(result_raw, self.visits,
-                                               ['user_id', 'session_start'],
-                                               'session_start')
+        retention_raw = self.lifetime_calculation(retention_raw, self.visits,
+                                                  ['user_id', 'session_start'],
+                                                  'session_start')
 
         # получаем таблицу удержания
-        result_grouped = self.group_by_dimensions(result_raw,
-                                                  dimensions,
-                                                  horizon)
+        retention_grouped = self.group_by_dimensions(retention_raw,
+                                                     dimensions,
+                                                     horizon)
 
         # получаем таблицу динамики удержания
-        result_in_time = self.group_by_dimensions(result_raw,
+        retention_hist = self.group_by_dimensions(retention_raw,
                                                   dimensions + ['dt'],
                                                   horizon)
 
         # сырые данные, таблица RR, таблица динамики RR
-        return result_raw, result_grouped, result_in_time
+        return retention_raw, retention_grouped, retention_hist
 
     def get_conversion(self, profiles, observation_date, horizon,
                        dimensions=[], ignore_horizon=False):
-        """Функция для расчёта конверсии."""
+        """Функция для расчёта конверсии (CR)."""
 
         # исключаем пользователей, не «доживших» до горизонта анализа
-        result_raw = self.acquisitions_date(profiles, observation_date,
-                                            horizon, ignore_horizon)
+        cr_raw = self.acquisitions_date(profiles, observation_date,
+                                        horizon, ignore_horizon)
 
         # определяем дату и время первой покупки для каждого пользователя
         first_purchases = (self.orders.sort_values(by=['user_id', 'event_dt'])
@@ -198,55 +201,55 @@ class MetricCalculator:
                            .reset_index())
 
         # добавляем данные о покупках в профили
-        result_raw = self.lifetime_calculation(result_raw, first_purchases,
-                                               ['user_id', 'event_dt'],
-                                               'event_dt')
+        cr_raw = self.lifetime_calculation(cr_raw, first_purchases,
+                                           ['user_id', 'event_dt'],
+                                           'event_dt')
 
         # группируем по cohort, если в dimensions ничего нет
-        result_raw, dimensions = self.dimensions_check(result_raw, dimensions)
+        cr_raw, dimensions = self.dimensions_check(cr_raw, dimensions)
 
         # получаем таблицу конверсии
-        result_grouped = self.group_by_dimensions(result_raw,
-                                                  dimensions,
-                                                  horizon)
+        cr_grouped = self.group_by_dimensions(cr_raw,
+                                              dimensions,
+                                              horizon)
 
         # для таблицы динамики конверсии убираем 'cohort' из dimensions
         if 'cohort' in dimensions:
             dimensions = []
 
         # получаем таблицу динамики конверсии
-        result_in_time = self.group_by_dimensions(result_raw,
-                                                  dimensions + ['dt'],
-                                                  horizon)
+        cr_hist = self.group_by_dimensions(cr_raw,
+                                           dimensions + ['dt'],
+                                           horizon)
 
         # сырые данные, таблица CR, таблица динамики CR
-        return result_raw, result_grouped, result_in_time
+        return cr_raw, cr_grouped, cr_hist
 
     def get_ltv(self, profiles, observation_date, horizon,
                 dimensions=[], ignore_horizon=False):
         """Функция для расчёта LTV и ROI."""
 
         # исключаем пользователей, не «доживших» до горизонта анализа
-        result_raw = self.acquisitions_date(profiles, observation_date,
-                                            horizon, ignore_horizon)
+        ltv_raw = self.acquisitions_date(profiles, observation_date,
+                                         horizon, ignore_horizon)
 
         # добавляем данные о покупках в профили
         to_merge_columns = ['user_id', 'event_dt', 'revenue']
-        result_raw = self.lifetime_calculation(result_raw, self.orders,
-                                               to_merge_columns,
-                                               'event_dt')
+        ltv_raw = self.lifetime_calculation(ltv_raw, self.orders,
+                                            to_merge_columns,
+                                            'event_dt')
 
         # группируем по cohort, если в dimensions ничего нет
-        result_raw, dimensions = self.dimensions_check(result_raw, dimensions)
+        ltv_raw, dimensions = self.dimensions_check(ltv_raw, dimensions)
 
         # получаем таблицы LTV и ROI
-        result_grouped = self.group_by_dimensions(result_raw,
-                                                  dimensions,
-                                                  horizon,
-                                                  aggfunc='sum',
-                                                  cumsum=True)
-        roi = self.cac_roi(result_raw,
-                           result_grouped,
+        ltv_grouped = self.group_by_dimensions(ltv_raw,
+                                               dimensions,
+                                               horizon,
+                                               aggfunc='sum',
+                                               cumsum=True)
+        roi = self.cac_roi(ltv_raw,
+                           ltv_grouped,
                            dimensions,
                            horizon)
 
@@ -255,34 +258,31 @@ class MetricCalculator:
             dimensions = []
 
         # получаем таблицы динамики LTV и ROI
-        result_in_time = self.group_by_dimensions(result_raw,
-                                                  dimensions + ['dt'],
-                                                  horizon,
-                                                  aggfunc='sum',
-                                                  cumsum=True)
-        roi_in_time = self.cac_roi(result_raw,
-                                   result_in_time, dimensions + ['dt'],
-                                   horizon)
+        ltv_hist = self.group_by_dimensions(ltv_raw,
+                                            dimensions + ['dt'],
+                                            horizon,
+                                            aggfunc='sum',
+                                            cumsum=True)
+        roi_hist = self.cac_roi(ltv_raw,
+                                ltv_hist, dimensions + ['dt'],
+                                horizon)
 
         # сырые данные, таблица LTV, динамика LTV, ROI, динамика ROI
-        return result_raw, result_grouped, result_in_time, roi, roi_in_time
+        return ltv_raw, ltv_grouped, ltv_hist, roi, roi_hist
 
-    def plot_retention(self, retention, retention_history, horizon, window=7):
+    def plot_retention(self, retention, retention_hist, horizon, window=7):
         """Функция для визуализации удержания."""
         plt.figure(figsize=(15, 10))
 
         retention = retention.drop(columns=['cohort_size', 0])
-        retention_history = retention_history.drop(
+        retention_hist = retention_hist.drop(
             columns=['cohort_size'])[[horizon - 1]]
 
-        # если в индексах таблицы удержания только payer,
-        # добавляем второй признак — cohort
         if retention.index.nlevels == 1:
             retention['cohort'] = 'All users'
             retention = retention.reset_index().set_index(['cohort', 'payer'])
 
-        # в таблице графиков — два столбца и две строки, четыре ячейки
-        # в первой строим кривые удержания платящих пользователей
+        # кривые удержания платящих пользователей
         ax1 = plt.subplot(2, 2, 1)
         retention.query('payer == True').droplevel('payer').T.plot(
             grid=True, ax=ax1)
@@ -290,8 +290,7 @@ class MetricCalculator:
         plt.xlabel('Лайфтайм')
         plt.title('Удержание платящих пользователей')
 
-        # во второй ячейке строим кривые удержания неплатящих
-        # вертикальная ось — от графика из первой ячейки
+        # кривые удержания неплатящих
         ax2 = plt.subplot(2, 2, 2, sharey=ax1)
         retention.query('payer == False').droplevel('payer').T.plot(
             grid=True, ax=ax2)
@@ -299,31 +298,24 @@ class MetricCalculator:
         plt.xlabel('Лайфтайм')
         plt.title('Удержание неплатящих пользователей')
 
-        # в третьей ячейке — динамика удержания платящих
+        # динамика удержания платящих
         ax3 = plt.subplot(2, 2, 3)
-        # получаем названия столбцов для сводной таблицы
-        columns = [
-            name
-            for name in retention_history.index.names
-            if name not in ['dt', 'payer']
-        ]
-        # фильтруем данные и строим график
-        filtered_data = retention_history.query('payer == True').pivot_table(
+        columns = [name for name in retention_hist.index.names
+                   if name not in ['dt', 'payer']]
+        filtered_data = retention_hist.query('payer == True').pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
         self.filter_data(filtered_data, window).plot(grid=True, ax=ax3)
         plt.xlabel('Дата привлечения')
-        plt.title('Динамика удержания платящих'
+        plt.title('Динамика удержания платящих '
                   f'пользователей на {horizon}-й день')
 
-        # в чётвертой ячейке — динамика удержания неплатящих
+        # динамика удержания неплатящих
         ax4 = plt.subplot(2, 2, 4, sharey=ax3)
-        # фильтруем данные и строим график
-        filtered_data = retention_history.query('payer == False').pivot_table(
-            index='dt', columns=columns, values=horizon - 1, aggfunc='mean'
-        )
+        filtered_data = retention_hist.query('payer == False').pivot_table(
+            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
         self.filter_data(filtered_data, window).plot(grid=True, ax=ax4)
         plt.xlabel('Дата привлечения')
-        plt.title('Динамика удержания неплатящих'
+        plt.title('Динамика удержания неплатящих '
                   f'пользователей на {horizon}-й день')
 
         plt.tight_layout()
@@ -334,22 +326,19 @@ class MetricCalculator:
 
         plt.figure(figsize=(15, 5))
 
-        # исключаем размеры когорт
         conversion = conversion.drop(columns=['cohort_size'])
-        # в таблице динамики оставляем только нужный лайфтайм
         conversion_hist = conversion_hist.drop(
             columns=['cohort_size'])[[horizon - 1]]
 
-        # первый график — кривые конверсии
+        # кривые конверсии
         ax1 = plt.subplot(1, 2, 1)
         conversion.T.plot(grid=True, ax=ax1)
         plt.legend()
         plt.xlabel('Лайфтайм')
         plt.title('Конверсия пользователей')
 
-        # второй график — динамика конверсии
+        # динамика конверсии
         ax2 = plt.subplot(1, 2, 2, sharey=ax1)
-        # столбцами сводной таблицы станут все столбцы индекса, кроме даты
         columns = [name for name in conversion_hist.index.names
                    if name not in ['dt']]
         filtered_data = conversion_hist.pivot_table(
@@ -366,41 +355,30 @@ class MetricCalculator:
 
         plt.figure(figsize=(20, 10))
 
-        # из таблицы ltv исключаем размеры когорт
         ltv = ltv.drop(columns=['cohort_size'])
-        # в таблице динамики ltv оставляем только нужный лайфтайм
         ltv_hist = ltv_hist.drop(columns=['cohort_size'])[[horizon - 1]]
-
-        # стоимость привлечения запишем в отдельный фрейм
         cac_hist = roi_hist[['cac']]
-
-        # из таблицы roi исключаем размеры когорт и cac
         roi = roi.drop(columns=['cohort_size', 'cac'])
-        # в таблице динамики roi оставляем только нужный лайфтайм
-        roi_hist = roi_hist.drop(columns=['cohort_size', 'cac'])[
-            [horizon - 1]
-        ]
+        roi_hist = roi_hist.drop(columns=['cohort_size', 'cac'])[[horizon - 1]]
 
-        # первый график — кривые ltv
+        # кривые ltv
         ax1 = plt.subplot(2, 3, 1)
         ltv.T.plot(grid=True, ax=ax1)
         plt.legend()
         plt.xlabel('Лайфтайм')
         plt.title('LTV')
 
-        # второй график — динамика ltv
+        # динамика ltv
         ax2 = plt.subplot(2, 3, 2, sharey=ax1)
-        # столбцами сводной таблицы станут все столбцы индекса, кроме даты
         columns = [name for name in ltv_hist.index.names if name not in ['dt']]
         filtered_data = ltv_hist.pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
         self.filter_data(filtered_data, window).plot(grid=True, ax=ax2)
         plt.xlabel('Дата привлечения')
-        plt.title('Динамика LTV пользователей на {}-й день'.format(horizon))
+        plt.title(f'Динамика LTV пользователей на {horizon}-й день')
 
-        # третий график — динамика cac
+        # динамика cac
         ax3 = plt.subplot(2, 3, 3, sharey=ax1)
-        # столбцами сводной таблицы станут все столбцы индекса, кроме даты
         columns = [name for name in cac_hist.index.names if name not in ['dt']]
         filtered_data = cac_hist.pivot_table(
             index='dt', columns=columns, values='cac', aggfunc='mean')
@@ -408,18 +386,17 @@ class MetricCalculator:
         plt.xlabel('Дата привлечения')
         plt.title('Динамика стоимости привлечения пользователей')
 
-        # четвёртый график — кривые roi
+        # кривые roi
         ax4 = plt.subplot(2, 3, 4)
         roi.T.plot(grid=True, ax=ax4)
-        plt.axhline(y=1, color='red', linestyle='--',
+        plt.axhline(y=cac_hist, color='red', linestyle='--',
                     label='Уровень окупаемости')
         plt.legend()
         plt.xlabel('Лайфтайм')
         plt.title('ROI')
 
-        # пятый график — динамика roi
+        # динамика roi
         ax5 = plt.subplot(2, 3, 5, sharey=ax4)
-        # столбцами сводной таблицы станут все столбцы индекса, кроме даты
         columns = [name for name in roi_hist.index.names if name not in ['dt']]
         filtered_data = roi_hist.pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
@@ -427,7 +404,7 @@ class MetricCalculator:
         plt.axhline(y=1, color='red', linestyle='--',
                     label='Уровень окупаемости')
         plt.xlabel('Дата привлечения')
-        plt.title('Динамика ROI пользователей на {}-й день'.format(horizon))
+        plt.title(f'Динамика ROI пользователей на {horizon}-й день')
 
         plt.tight_layout()
         plt.show()
