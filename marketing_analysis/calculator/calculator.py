@@ -16,7 +16,6 @@ class MetricCalculator:
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
         необходимости, конвертируем формат."""
-
         self.visits.columns = self.visits.columns.str.lower()
         self.orders.columns = self.orders.columns.str.lower()
         self.costs.columns = self.costs.columns.str.lower()
@@ -35,7 +34,6 @@ class MetricCalculator:
     def acquisitions_date(self, profiles, observation,
                           horizon, ignore_horizon):
         """Исключаем пользователей, не «доживших» до горизонта анализа"""
-
         if ignore_horizon:
             acquisition_date = observation
         acquisition_date = observation - timedelta(days=horizon - 1)
@@ -45,7 +43,6 @@ class MetricCalculator:
     def group_by_dimensions(self, df, dims, horizon,
                             aggfunc='nunique', cumsum=False):
         """Группировка таблицы по желаемым признакам."""
-
         result = df.pivot_table(
             index=dims, columns='lifetime', values='user_id', aggfunc=aggfunc)
         if cumsum:
@@ -92,20 +89,25 @@ class MetricCalculator:
     def lifetime_calculation(self, df, to_merge, columns_to_merge, last_date):
         """добавляем данные о покупках и рассчитываем лайфтайм пользователя для
         каждой покупки."""
-
         df = df.merge(to_merge[columns_to_merge], on='user_id', how='left')
         df['lifetime'] = (df[last_date] - df['first_ts']).dt.days
         return df
 
     def dimensions_check(self, df, dims):
+        """Функция для группировки по коготам если в dims пусто"""
         if len(dims) == 0:
             df['cohort'] = 'All users'
             dims = dims + ['cohort']
         return df, dims
 
+    def filter_data(df, window):
+        """Функция для сглаживания фрейма: применяем скользящее среднее."""
+        for column in df.columns.values:
+            df[column] = df[column].rolling(window).mean() 
+        return df
+
     def get_profiles(self):
         """Cоздаем пользовательские профили."""
-
         ad_costs = self.costs.copy()
 
         # находим параметры первых посещений
