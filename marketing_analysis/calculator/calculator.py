@@ -304,7 +304,8 @@ class MetricCalculator:
                    if name not in ['dt', 'payer']]
         filtered_data = retention_hist.query('payer == True').pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
-        self.filter_data(filtered_data, window).plot(grid=True, ax=ax3)
+        filtered_data = self.filter_data(filtered_data, window)
+        filtered_data.plot(grid=True, ax=ax3)
         plt.xlabel('Дата привлечения')
         plt.title('Динамика удержания платящих '
                   f'пользователей на {horizon}-й день')
@@ -343,7 +344,8 @@ class MetricCalculator:
                    if name not in ['dt']]
         filtered_data = conversion_hist.pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
-        self.filter_data(filtered_data, window).plot(grid=True, ax=ax2)
+        filtered_data = self.filter_data(filtered_data, window)
+        filtered_data.plot(grid=True, ax=ax2)
         plt.xlabel('Дата привлечения')
         plt.title(f'Динамика конверсии пользователей на {horizon}-й день')
 
@@ -389,7 +391,7 @@ class MetricCalculator:
         # кривые roi
         ax4 = plt.subplot(2, 3, 4)
         roi.T.plot(grid=True, ax=ax4)
-        plt.axhline(y=cac_hist, color='red', linestyle='--',
+        plt.axhline(y=1, color='red', linestyle='--',
                     label='Уровень окупаемости')
         plt.legend()
         plt.xlabel('Лайфтайм')
