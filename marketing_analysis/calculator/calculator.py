@@ -307,7 +307,7 @@ class MetricCalculator:
         filtered_data = retention_hist.query('payer == True').pivot_table(
             index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
         filtered_data = self.filter_data(filtered_data, window)
-        filtered_data.plot(grid=True, ax=ax3)
+        filtered_data.plot(grid=True, ax=ax3, sharey=ax1)
         plt.xlabel('Дата привлечения')
         plt.title('Динамика удержания платящих '
                   f'пользователей на {horizon}-й день')
