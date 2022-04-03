@@ -3,6 +3,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 import seaborn as sns
+import squarify
+
 
 class MetricCalculator:
     """Создаем профили пользователя, расчитываем и визуализируем метрики."""
@@ -456,16 +458,30 @@ class MetricCalculator:
         ax.set_xlabel(x_label)
         ax.set_title(title)
 
-    def sns_catplot(self, x, y, data, title='', 
+    def sns_catplot(self, x, y, data, title='',
                     xlabel='', ylabel='', *args, **kwargs):
         """Гистограмма."""
+        plt.figure(figsize=(7, 7), dpi=80)
         plt.style.use('seaborn-darkgrid')
         sns.catplot(x=x, y=y,
                     kind='bar', color='orange',
                     data=data,
-                    height=7, aspect=1.9, saturation=.5)
-        _ = plt.title(title, fontsize=18, loc='left')
-        _ = plt.xlabel(xlabel, fontsize=18)
-        _ = plt.ylabel(ylabel, fontsize=18)
+                    height=7, aspect=.9, saturation=.5)
+        _ = plt.title(title, fontsize=12, loc='left')
+        _ = plt.xlabel(xlabel, fontsize=12)
+        _ = plt.ylabel(ylabel, fontsize=12)
         _ = plt.xticks(rotation=45)
         plt.show()
+
+    def square_plot(self, df, column, title=''):
+        df_grouped = df.groupby(column).size().reset_index(name='counts')
+        labels = df_grouped.apply(lambda x: str(
+            x[0]) + "\n (" + str(x[1]) + ")", axis=1)
+        sizes = df_grouped['counts'].values.tolist()
+        colors = [plt.cm.Spectral(i/float(len(labels)))
+                  for i in range(len(labels))]
+
+        plt.figure(figsize=(7, 7), dpi=80)
+        squarify.plot(sizes=sizes, label=labels, color=colors, alpha=.8)
+        plt.title(title)
+        plt.axis('off')
