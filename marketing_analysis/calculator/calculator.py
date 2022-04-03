@@ -8,10 +8,10 @@ class MetricCalculator:
     """Создаем профили пользователя, расчитываем и визуализируем метрики."""
 
     def __init__(self, visits, orders, costs):
-        self.visits = pd.read_csv(visits, parse_dates=['Session Start'])
+        self.visits = pd.read_csv(visits, parse_dates=['Session Start',
+                                                       'Session End'])
         self.orders = pd.read_csv(orders, parse_dates=['Event Dt'])
         self.costs = pd.read_csv(costs, parse_dates=['dt'])
-        self.profiles = None
 
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
@@ -410,3 +410,48 @@ class MetricCalculator:
 
         plt.tight_layout()
         plt.show()
+
+    def histogram(self, data, n_bins, range_start, range_end, grid,
+                  cumulative=False, x_label='', y_label='', title=''):
+        """Простая гистограмма
+
+        Пример:
+        histogram(df, 100, 0, 150, True, 'Количество иксов',
+                  'Количество игриков', 'Заголовок')
+
+        data - датасет
+        n_bins - количество корзин
+        range_start - минимальный икс для корзины
+        range_end - максимальный икс для корзины
+        grid - рисовать сетку или нет (False / True)
+
+
+        histogram(data, n_bins, range_start, range_end, grid,
+                  x_label = "", y_label = "", title = "")
+        """
+
+        # Создаем объект - график
+        _, ax = plt.subplots()
+
+        # Задаем параметры
+        ax.hist(data, bins=n_bins, range=(range_start, range_end),
+                cumulative=cumulative, color='#4169E1')
+
+        # Добавляем сетку
+        if grid == True:
+            ax.grid(color='grey', linestyle='-', linewidth=0.5)
+        else:
+            pass
+
+        # Добавляем медиану, среднее и квартили
+        ax.axvline(data.median(), linestyle='--',
+                   color='#FF1493', label='median')
+        ax.axvline(data.mean(), linestyle='--', color='orange', label='mean')
+        ax.axvline(data.quantile(0.1), linestyle='--',
+                   color='yellow', label='1%')
+        ax.axvline(data.quantile(0.99), linestyle='--',
+                   color='yellow', label='99%')
+        ax.legend()
+        ax.set_ylabel(y_label)
+        ax.set_xlabel(x_label)
+        ax.set_title(title)
