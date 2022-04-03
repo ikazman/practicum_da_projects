@@ -43,10 +43,10 @@ class MetricCalculator:
         return raw_data
 
     def group_by_dimensions(self, df, dims, horizon,
-                            aggfunc='nunique', cumsum=False):
+                            values='user_id', aggfunc='nunique', cumsum=False):
         """Группировка таблицы по желаемым признакам."""
         result = df.pivot_table(index=dims, columns='lifetime',
-                                values='user_id', aggfunc=aggfunc)
+                                values=values, aggfunc=aggfunc)
 
         if cumsum:
             result = result.fillna(0).cumsum(axis=1)
@@ -248,6 +248,7 @@ class MetricCalculator:
         ltv_grouped = self.group_by_dimensions(ltv_raw,
                                                dimensions,
                                                horizon,
+                                               values='revenue',
                                                aggfunc='sum',
                                                cumsum=True)
         roi = self.cac_roi(ltv_raw,
@@ -263,6 +264,7 @@ class MetricCalculator:
         ltv_hist = self.group_by_dimensions(ltv_raw,
                                             dimensions + ['dt'],
                                             horizon,
+                                            values='revenue',
                                             aggfunc='sum',
                                             cumsum=True)
         roi_hist = self.cac_roi(ltv_raw,
@@ -382,7 +384,7 @@ class MetricCalculator:
         plt.title(f'Динамика LTV пользователей на {horizon}-й день')
 
         # динамика cac
-        ax3 = plt.subplot(2, 3, 3)
+        ax3 = plt.subplot(2, 3, 3, sharey=ax1)
         columns = [name for name in cac_hist.index.names if name not in ['dt']]
         filtered_data = cac_hist.pivot_table(
             index='dt', columns=columns, values='cac', aggfunc='mean')
