@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
-
+import seaborn as sns
 
 class MetricCalculator:
     """Создаем профили пользователя, расчитываем и визуализируем метрики."""
@@ -455,3 +455,17 @@ class MetricCalculator:
         ax.set_ylabel(y_label)
         ax.set_xlabel(x_label)
         ax.set_title(title)
+
+    def sns_catplot(self, x, y, data, title='', 
+                    xlabel='', ylabel='', *args, **kwargs):
+        """Гистограмма."""
+        plt.style.use('seaborn-darkgrid')
+        sns.catplot(x=x, y=y,
+                    kind='bar', color='orange',
+                    data=data,
+                    height=7, aspect=1.9, saturation=.5)
+        _ = plt.title(title, fontsize=18, loc='left')
+        _ = plt.xlabel(xlabel, fontsize=18)
+        _ = plt.ylabel(ylabel, fontsize=18)
+        _ = plt.xticks(rotation=45)
+        plt.show()
