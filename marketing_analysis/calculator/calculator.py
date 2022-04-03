@@ -382,7 +382,7 @@ class MetricCalculator:
         plt.title(f'Динамика LTV пользователей на {horizon}-й день')
 
         # динамика cac
-        ax3 = plt.subplot(2, 3, 3, sharey=ax1)
+        ax3 = plt.subplot(2, 3, 3)
         columns = [name for name in cac_hist.index.names if name not in ['dt']]
         filtered_data = cac_hist.pivot_table(
             index='dt', columns=columns, values='cac', aggfunc='mean')
@@ -412,51 +412,6 @@ class MetricCalculator:
 
         plt.tight_layout()
         plt.show()
-
-    def histogram(self, data, n_bins, range_start, range_end, grid,
-                  cumulative=False, x_label='', y_label='', title=''):
-        """Простая гистограмма
-
-        Пример:
-        histogram(df, 100, 0, 150, True, 'Количество иксов',
-                  'Количество игриков', 'Заголовок')
-
-        data - датасет
-        n_bins - количество корзин
-        range_start - минимальный икс для корзины
-        range_end - максимальный икс для корзины
-        grid - рисовать сетку или нет (False / True)
-
-
-        histogram(data, n_bins, range_start, range_end, grid,
-                  x_label = "", y_label = "", title = "")
-        """
-
-        # Создаем объект - график
-        _, ax = plt.subplots()
-
-        # Задаем параметры
-        ax.hist(data, bins=n_bins, range=(range_start, range_end),
-                cumulative=cumulative, color='#4169E1')
-
-        # Добавляем сетку
-        if grid == True:
-            ax.grid(color='grey', linestyle='-', linewidth=0.5)
-        else:
-            pass
-
-        # Добавляем медиану, среднее и квартили
-        ax.axvline(data.median(), linestyle='--',
-                   color='#FF1493', label='median')
-        ax.axvline(data.mean(), linestyle='--', color='orange', label='mean')
-        ax.axvline(data.quantile(0.1), linestyle='--',
-                   color='yellow', label='1%')
-        ax.axvline(data.quantile(0.99), linestyle='--',
-                   color='yellow', label='99%')
-        ax.legend()
-        ax.set_ylabel(y_label)
-        ax.set_xlabel(x_label)
-        ax.set_title(title)
 
     def sns_catplot(self, x, y, data, title='',
                     xlabel='', ylabel='', *args, **kwargs):
