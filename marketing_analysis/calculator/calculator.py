@@ -33,6 +33,27 @@ class MetricCalculator:
                                     'event dt': 'event_dt'},
                            inplace=True)
 
+    def grouped_summary(self, profiles, dim, dim_name):
+        """Получаем сводную таблицу с % платящих."""
+        columns = {dim: dim_name,
+                   'user_id_y': 'число клиентов',
+                   'user_id_x': 'платящие'}
+        unique_cnt = profiles.groupby(dim)['user_id'].nunique()
+        dim_by_payer = (profiles.query('payer == True')
+                                .groupby(dim)
+                                .agg({'user_id': 'count'}).reset_index())
+        dim_by_payer['% от платящих'] = (dim_by_payer['user_id'] * 100 /
+                                         dim_by_payer['user_id'].sum())
+        dim_by_payer = (dim_by_payer.merge(unique_cnt, on=dim)
+                                    .rename(columns=columns))
+        sums_row = pd.Series(['---', sum(dim_by_payer['платящие']),
+                              sum(dim_by_payer['% от платящих']),
+                              sum(dim_by_payer['число клиентов'])],
+                             index=dim_by_payer.columns)
+        dim_by_payer = dim_by_payer.sort_values(by='платящие')
+        dim_by_payer = dim_by_payer.append(sums_row, ignore_index=True)
+        return dim_by_payer
+
     def acquisitions_date(self, profiles, observation,
                           horizon, ignore_horizon):
         """Исключаем пользователей, не «доживших» до горизонта анализа."""
