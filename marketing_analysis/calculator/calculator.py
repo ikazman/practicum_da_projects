@@ -463,3 +463,27 @@ class MetricCalculator:
         squarify.plot(sizes=sizes, label=labels, color=colors, alpha=.8)
         plt.title(title)
         plt.axis('off')
+
+    def histogram(self, data, n_bins, range_start, range_end,
+                  grid=True, cumulative=False,
+                  x_label='', y_label='', title=''):
+        """Простая гистограмма."""
+
+        _, ax = plt.subplots()
+        ax.hist(data, bins=n_bins, range=(range_start, range_end),
+                cumulative=cumulative, color='#4169E1')
+
+        if grid == True:
+            ax.grid(color='grey', linestyle='-', linewidth=0.5)
+
+        ax.axvline(data.median(), linestyle='--',
+                   color='#FF1493', label='median')
+        ax.axvline(data.mean(), linestyle='--', color='orange', label='mean')
+        ax.axvline(data.quantile(0.1), linestyle='--',
+                   color='yellow', label='1%')
+        ax.axvline(data.quantile(0.99), linestyle='--',
+                   color='yellow', label='99%')
+        ax.legend()
+        ax.set_ylabel(y_label)
+        ax.set_xlabel(x_label)
+        ax.set_title(title)
