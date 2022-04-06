@@ -18,20 +18,13 @@ class MetricCalculator:
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
         необходимости, конвертируем формат."""
-        self.visits.columns = self.visits.columns.str.lower()
-        self.orders.columns = self.orders.columns.str.lower()
-        self.costs.columns = self.costs.columns.str.lower()
+        datasets = [self.visits, self.orders, self.costs]
+
+        for dataset in datasets:
+            dataset.columns = [name.lower().replace(' ', '_') for name
+                               in dataset.columns.values]
 
         self.costs['dt'] = self.costs['dt'].dt.date
-
-        self.visits.rename(columns={'user id': 'user_id',
-                                    'session start': 'session_start',
-                                    'session end': 'session_end'},
-                           inplace=True)
-
-        self.orders.rename(columns={'user id': 'user_id',
-                                    'event dt': 'event_dt'},
-                           inplace=True)
 
     def grouped_summary(self, profiles, dim, dim_name):
         """Получаем сводную таблицу с % платящих."""
