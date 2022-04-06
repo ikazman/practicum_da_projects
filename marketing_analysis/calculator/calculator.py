@@ -39,10 +39,13 @@ class MetricCalculator:
                                          dim_by_payer['user_id'].sum())
         dim_by_payer = (dim_by_payer.merge(unique_cnt, on=dim)
                                     .rename(columns=columns))
+        dim_by_payer['% платящих'] = (dim_by_payer['платящие'] * 100 /
+                                      dim_by_payer['число клиентов'])
         sums_row = pd.Series(['---', sum(dim_by_payer['платящие']),
                               sum(dim_by_payer['% от платящих']),
-                              sum(dim_by_payer['число клиентов'])],
-                             index=dim_by_payer.columns)
+                              sum(dim_by_payer['число клиентов']),
+                              '---'],
+                              index=dim_by_payer.columns)
         dim_by_payer = dim_by_payer.sort_values(by='платящие')
         dim_by_payer = dim_by_payer.append(sums_row, ignore_index=True)
         return dim_by_payer
