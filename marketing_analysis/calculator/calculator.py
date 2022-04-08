@@ -466,7 +466,7 @@ class MetricCalculator:
                   x_label='', y_label='', title=''):
         """Простая гистограмма."""
 
-        _, ax = plt.subplots()
+        _, ax = plt.subplots(figsize=(15, 10), dpi=80)
         ax.hist(data, bins=n_bins, range=(range_start, range_end),
                 cumulative=cumulative, color='#4169E1')
 
