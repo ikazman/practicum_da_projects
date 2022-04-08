@@ -230,7 +230,8 @@ class MetricCalculator:
         # получаем таблицу конверсии
         cr_grouped = self.group_by_dimensions(cr_raw,
                                               dimensions,
-                                              horizon)
+                                              horizon,
+                                              cumsum=True)
 
         # для таблицы динамики конверсии убираем 'cohort' из dimensions
         if 'cohort' in dimensions:
