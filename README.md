@@ -9,4 +9,4 @@ _Примечание: датасеты, использованные в про�
 - ### Анализ бизнес-показателей
 	- [Маркетинговый анализ](https://github.com/ikazman/practicum_da_projects/blob/main/marketing_analysis/maketing_analysis.ipynb): расчет LTV, ROI, удержание и конверсия, выявление аномалий.
 
-	_Инструменты: Pandas, Numpy, Scipy, Statsmodel, Scikit-learn, Seaborn, Plotly, Matplotlib_
+	_Инструменты: Pandas, Seaborn, Matplotlib_
