@@ -31,7 +31,7 @@ class ABReporter:
         return cumulated.set_index('index')
 
     def grouped_summary(self):
-        """Получаем сводную таблицу посетителей и заказов."""
+        """Получаем сводную таблицу посетителей и заказов./"""
         columns = ['date', 'group', 'orders', 'buyers', 'revenue', 'visitors']
         visitors = (self.visitors
                     .groupby(['date', 'group'], as_index=False)
