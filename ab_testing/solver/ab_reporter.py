@@ -47,8 +47,8 @@ class ABReporter:
                         'visitorId': 'nunique',
                         'revenue': 'sum'}, axis=1))
 
-        visitors['visitors'] = self.cumulate_column(visitors,'visitors')
-        orders['revenue'] = self.cumulate_column(orders,'revenue')
+        visitors['visitors'] = self.cumulate_column(visitors, 'visitors')
+        orders['revenue'] = self.cumulate_column(orders, 'revenue')
         orders['transactionId'] = self.cumulate_column(orders, 'transactionId')
         orders['visitorId'] = self.cumulate_column(orders, 'visitorId')
 
@@ -63,48 +63,69 @@ class ABReporter:
 
     def plot_cumulative_metrics(self):
         """Функция для визуализации кумулятивных метрик."""
-        plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(25, 10))
+        plt.style.use('seaborn-darkgrid')
 
-        columns_to_pick = ['date','revenue', 'orders']
-        revenue_a = self.cumulated.query('group == "A"')[columns_to_pick]
-        revenue_b = self.cumulated.query('group == "B"')[columns_to_pick]
+        columns_to_pick = ['date', 'revenue', 'orders', 'conversion']
+        cumulated_copy = self.cumulated.copy()
+        cumulated_copy['date'] = cumulated_copy['date'].dt.date
+        revenue_a = cumulated_copy.query('group == "A"')[columns_to_pick]
+        revenue_b = cumulated_copy.query('group == "B"')[columns_to_pick]
+        merged_revenues = revenue_a.merge(revenue_b,
+                                          left_on='date', right_on='date',
+                                          how='left', suffixes=['_a', '_b'])
+        mean_b_a_revenue_ratio = (((merged_revenues['revenue_b'] /
+                                    merged_revenues['orders_b']) /
+                                    (merged_revenues['revenue_a'] /
+                                    merged_revenues['orders_a']) - 1))
+        conversion_b_a_ratio = (merged_revenues['conversion_b'] /
+                                merged_revenues['conversion_a'] - 1)
+
+        merged_revenues['mean_revenue_ratio'] = mean_b_a_revenue_ratio
+        merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
         # кривые удержания платящих пользователей
         ax1 = plt.subplot(2, 3, 1)
-        plt.plot(revenue_a['date'], revenue_a['revenue'], grid=True, label='A', ax=ax1)
-        plt.plot(revenue_b['date'], revenue_b['revenue'], grid=True, label='B', ax=ax1)
+        ax1.set_xticks(revenue_a['date'][::7])
+        ax1.set_xticklabels(revenue_a['date'][::7])
+        plt.plot(revenue_a['date'], revenue_a['revenue'], label='группа A')
+        plt.plot(revenue_b['date'], revenue_b['revenue'], label='группа B')
         plt.legend()
+        plt.ylabel('Выручка')
         plt.xlabel('Лайфтайм')
-        plt.title('Удержание платящих пользователей')
+        plt.title('Графики кумулятивной выручки по дням и группам')
 
-        # кривые удержания неплатящих
-        ax2 = plt.subplot(2, 2, 2, sharey=ax1)
-        retention.query('payer == False').droplevel('payer').T.plot(
-            grid=True, ax=ax2)
+        ax2 = plt.subplot(2, 3, 2, sharex=ax1)
+        plt.plot(revenue_a['date'], revenue_a['revenue'] /
+                 revenue_a['orders'], label='группа A')
+        plt.plot(revenue_b['date'], revenue_b['revenue'] /
+                 revenue_b['orders'], label='группа B')
         plt.legend()
+        plt.ylabel('Средняя сумма чека')
         plt.xlabel('Лайфтайм')
-        plt.title('Удержание неплатящих пользователей')
+        plt.title('Графики среднего чека по группам')
 
-        # динамика удержания платящих
-        ax3 = plt.subplot(2, 2, 3)
-        columns = [name for name in retention_hist.index.names
-                   if name not in ['dt', 'payer']]
-        filtered_data = retention_hist.query('payer == True').pivot_table(
-            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
-        filtered_data = self.filter_data(filtered_data, window)
-        filtered_data.plot(grid=True, ax=ax3, sharey=ax1)
-        plt.xlabel('Дата привлечения')
-        plt.title('Динамика удержания платящих '
-                  f'пользователей на {horizon}-й день')
+        ax3 = plt.subplot(2, 3, 3, sharex=ax1)
+        plt.plot(merged_revenues['date'],
+                 merged_revenues['mean_revenue_ratio'])
+        plt.axhline(y=0, color='black', linestyle='--')
+        plt.ylabel('Отношение средних чеков')
+        plt.xlabel('Лайфтайм')
+        plt.title('График относительного различия для среднего чека')
 
-        # динамика удержания неплатящих
-        ax4 = plt.subplot(2, 2, 4, sharey=ax3)
-        filtered_data = retention_hist.query('payer == False').pivot_table(
-            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
-        self.filter_data(filtered_data, window).plot(grid=True, ax=ax4)
-        plt.xlabel('Дата привлечения')
-        plt.title('Динамика удержания неплатящих '
-                  f'пользователей на {horizon}-й день')
+        ax4=plt.subplot(2, 3, 4, sharex=ax1)
+        plt.plot(revenue_a['date'], revenue_a['conversion'], label='A')
+        plt.plot(revenue_b['date'], revenue_b['conversion'], label='B')
+        plt.legend()
+        plt.ylabel('Конверсия')
+        plt.xlabel('Лайфтайм')
+        plt.title('График кумулятивной конверсии')
 
+        ax5=plt.subplot(2, 3, 5, sharex=ax1)
+        plt.plot(merged_revenues['date'], merged_revenues['conversion_b_a'])
+        plt.axhline(y=0, color='black', linestyle='--')
+        plt.axhline(y=-0.1, color='grey', linestyle='--')
+        plt.title('Относительный прирост конверсии группы '
+                  'B относительно группы A')
         plt.tight_layout()
         plt.show()
