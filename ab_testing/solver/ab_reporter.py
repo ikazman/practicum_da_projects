@@ -11,6 +11,7 @@ class ABReporter:
     def __init__(self, visitors, orders):
         self.visitors = pd.read_csv(visitors, parse_dates=['date'])
         self.orders = pd.read_csv(orders, parse_dates=['date'])
+        self.cumulated = None
 
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
@@ -54,5 +55,54 @@ class ABReporter:
         result = orders.merge(visitors)
         result.columns = columns
 
+        self.cumulated = result
+
         return result
 
+    def plot_cumulative_metrics(self):
+        """Функция для визуализации кумулятивных метрик."""
+        plt.figure(figsize=(15, 10))
+
+        columns_to_pick = ['date','revenue', 'orders']
+        revenue_a = self.cumulated.query('group == "A"')[columns_to_pick]
+        revenue_b = self.cumulated.query('group == "B"'][columns_to_pick]
+
+        # кривые удержания платящих пользователей
+        ax1 = plt.subplot(2, 3, 1)
+        plt.plot(revenue_a['date'], revenue_a['revenue'], label='A', ax=ax1)
+        plt.plot(revenue_b['date'], revenue_b['revenue'], label='B', ax=ax1)
+        plt.legend()
+        plt.xlabel('Лайфтайм')
+        plt.title('Удержание платящих пользователей')
+
+        # кривые удержания неплатящих
+        ax2 = plt.subplot(2, 2, 2, sharey=ax1)
+        retention.query('payer == False').droplevel('payer').T.plot(
+            grid=True, ax=ax2)
+        plt.legend()
+        plt.xlabel('Лайфтайм')
+        plt.title('Удержание неплатящих пользователей')
+
+        # динамика удержания платящих
+        ax3 = plt.subplot(2, 2, 3)
+        columns = [name for name in retention_hist.index.names
+                   if name not in ['dt', 'payer']]
+        filtered_data = retention_hist.query('payer == True').pivot_table(
+            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
+        filtered_data = self.filter_data(filtered_data, window)
+        filtered_data.plot(grid=True, ax=ax3, sharey=ax1)
+        plt.xlabel('Дата привлечения')
+        plt.title('Динамика удержания платящих '
+                  f'пользователей на {horizon}-й день')
+
+        # динамика удержания неплатящих
+        ax4 = plt.subplot(2, 2, 4, sharey=ax3)
+        filtered_data = retention_hist.query('payer == False').pivot_table(
+            index='dt', columns=columns, values=horizon - 1, aggfunc='mean')
+        self.filter_data(filtered_data, window).plot(grid=True, ax=ax4)
+        plt.xlabel('Дата привлечения')
+        plt.title('Динамика удержания неплатящих '
+                  f'пользователей на {horizon}-й день')
+
+        plt.tight_layout()
+        plt.show()
