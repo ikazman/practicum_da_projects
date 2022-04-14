@@ -55,6 +55,8 @@ class ABReporter:
         result = orders.merge(visitors)
         result.columns = columns
 
+        result['conversion'] = result['orders'] / result['visitors']
+
         self.cumulated = result
 
         return result
@@ -65,12 +67,12 @@ class ABReporter:
 
         columns_to_pick = ['date','revenue', 'orders']
         revenue_a = self.cumulated.query('group == "A"')[columns_to_pick]
-        revenue_b = self.cumulated.query('group == "B"'][columns_to_pick]
+        revenue_b = self.cumulated.query('group == "B"')[columns_to_pick]
 
         # кривые удержания платящих пользователей
         ax1 = plt.subplot(2, 3, 1)
-        plt.plot(revenue_a['date'], revenue_a['revenue'], label='A', ax=ax1)
-        plt.plot(revenue_b['date'], revenue_b['revenue'], label='B', ax=ax1)
+        plt.plot(revenue_a['date'], revenue_a['revenue'], grid=True, label='A', ax=ax1)
+        plt.plot(revenue_b['date'], revenue_b['revenue'], grid=True, label='B', ax=ax1)
         plt.legend()
         plt.xlabel('Лайфтайм')
         plt.title('Удержание платящих пользователей')
