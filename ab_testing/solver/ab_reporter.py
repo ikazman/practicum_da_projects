@@ -25,11 +25,11 @@ class ABReporter:
             dataset.columns = [name.lower().replace(' ', '_') for name
                                in dataset.columns.values]
 
-    def get_placeholders(self, data):
+    def get_placeholders(self, data, group):
         """Заполняем выборки нулями."""
-        full_length = self.cumulated.query('group == "A"')['visitors'].sum()
-        index = np.arange(full_length - len(data), name='orders')
-        placeholders = pd.Series(0, index=index)
+        full_length = self.cumulated.query(f'group == "{group}"')['visitors']
+        index = np.arange(full_length.sum() - len(data))
+        placeholders = pd.Series(0, index=index, name='orders')
         return placeholders
 
     def prepare_data_for_stat(self):
@@ -40,11 +40,13 @@ class ABReporter:
         orders_by_b = (self.orders.query('group == "B"')
                                   .groupby('visitorId', as_index=False)
                                   .agg({'transactionId': 'nunique'}))
+        orders_by_a.columns = ['visitorId', 'orders']
+        orders_by_b.columns = ['visitorId', 'orders']
 
         sample_raw_a = pd.concat([orders_by_a['orders'],
-                                  self.get_placeholders(orders_by_a)], axis=0)
+                                  self.get_placeholders(orders_by_a, 'A')], axis=0)
         sample_raw_b = pd.concat([orders_by_b['orders'],
-                                  self.get_placeholders(orders_by_b)], axis=0)
+                                  self.get_placeholders(orders_by_b, 'B')], axis=0)
 
         outliers_orders_a = orders_by_a.query('orders > 2')['visitorId']
         outliers_orders_b = orders_by_b.query('orders > 2')['visitorId']
@@ -70,9 +72,9 @@ class ABReporter:
             'visitorId not in @anomalies')['orders']
 
         sample_clean_a = pd.concat(
-            [cleaned_by_a, self.get_placeholders(orders_by_a)])
+            [cleaned_by_a, self.get_placeholders(orders_by_a, 'A')])
         sample_clean_b = pd.concat(
-            [cleaned_by_b, self.get_placeholders(orders_by_b)])
+            [cleaned_by_b, self.get_placeholders(orders_by_b, 'B')])
 
         prepared_data = {'sample_raw_a': sample_raw_a,
                          'sample_raw_b': sample_raw_b,
@@ -85,6 +87,11 @@ class ABReporter:
 
         return prepared_data
 
+    def hypo_check(self, row):
+        if row['p-value < alpha']:
+            return 'Н1'
+        return 'Н0'
+
     def mannwhitneyu(self):
         result = []
 
@@ -95,27 +102,33 @@ class ABReporter:
         # в конверсии между группами по «сырым» данным
         raw_conv_result = stats.mannwhitneyu(prepared_data['sample_raw_a'],
                                              prepared_data['sample_raw_b'])[1]
-        result.append(raw_conv_result)
+        result.append(('Конверсия по сырым', raw_conv_result))
 
         # Считаем статистическую значимость различий
         # в среднем чеке заказа между группами по «сырым» данным
         raw_revenue_result = stats.mannwhitneyu(prepared_data['revenue_a'],
                                                 prepared_data['revenue_b'])[1]
-        result.append(raw_revenue_result)
+        result.append(('Средний чек по сырым', raw_revenue_result))
 
         # Считаем статистическую значимость различий
         # в конверсии между группами по «очищенным» данным
         clean_conv_result = stats.mannwhitneyu(
             prepared_data['sample_clean_a'], prepared_data['sample_clean_b'])[1]
-        result.append(clean_conv_result)
+        result.append(('Конверсия по очищенным', clean_conv_result))
 
         # Считаем статистическую значимость различий
         # в среднем чеке заказа между группами по «очищенным» данным
         clean_rev_result = stats.mannwhitneyu(prepared_data['clean_rev_a'],
                                               prepared_data['clean_rev_b'])[1]
-        result.append(clean_rev_result)
+        result.append(('Средний чек по очищенным', clean_rev_result))
 
         result = pd.DataFrame(result)
+        result.columns = ['Гипотеза', 'p-value']
+        result['alpha'] = 0.05
+        result['p-value < alpha'] = result['p-value'] < result['alpha']
+        result['Н0/Н1'] = result.apply(self.hypo_check, axis=1)
+
+        return result
 
     def cumulate_column(self, df, column):
         """Cуммируем элементы колонки с накоплением."""
