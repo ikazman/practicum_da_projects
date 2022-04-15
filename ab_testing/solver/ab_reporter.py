@@ -23,6 +23,24 @@ class ABReporter:
             dataset.columns = [name.lower().replace(' ', '_') for name
                                in dataset.columns.values]
 
+    def get_anomalies(self, orders_by_a, orders_by_b):
+        """Получаем данные с аномалиями."""
+
+        # Отберем выбросы по заказам
+        outliers_orders_a = orders_by_a.query('orders > 2')['visitorId']
+        outliers_orders_b = orders_by_b.query('orders > 2')['visitorId']
+        outliers_orders = pd.concat([outliers_orders_a,
+                                     outliers_orders_b], axis=0)
+
+        # Отберем выбросы по выручке
+        outliers_revenue = self.orders.query('revenue > 28000')['visitorId']
+
+        # Объединим выбросы
+        anomalies = (pd.concat([outliers_orders, outliers_revenue], axis=0)
+                     .drop_duplicates().sort_values())
+
+        return anomalies
+    
     def get_placeholders(self, data, group):
         """Заполняем выборки нулями."""
         full_length = self.cumulated.query(f'group == "{group}"')['visitors']
@@ -32,6 +50,8 @@ class ABReporter:
 
     def prepare_data_for_stat(self):
         """Готовим данные для статистических тестов."""
+
+        # Сгруппируем данные по группам
         orders_by_a = (self.orders.query('group == "A"')
                                   .groupby('visitorId', as_index=False)
                                   .agg({'transactionId': 'nunique'}))
@@ -41,38 +61,38 @@ class ABReporter:
         orders_by_a.columns = ['visitorId', 'orders']
         orders_by_b.columns = ['visitorId', 'orders']
 
+        # Получим плейсхолдеры для пользователей без заказов
+        placeholders_a = self.get_placeholders(orders_by_a, 'A')
+        placeholders_b = self.get_placeholders(orders_by_b, 'B')
+
+        # Сырые выборки с заказами
         sample_raw_a = pd.concat([orders_by_a['orders'],
-                                  self.get_placeholders(orders_by_a, 'A')], axis=0)
+                                  placeholders_a], axis=0)
         sample_raw_b = pd.concat([orders_by_b['orders'],
-                                  self.get_placeholders(orders_by_b, 'B')], axis=0)
+                                  placeholders_b], axis=0)
 
-        outliers_orders_a = orders_by_a.query('orders > 2')['visitorId']
-        outliers_orders_b = orders_by_b.query('orders > 2')['visitorId']
-        outliers_orders = pd.concat(
-            [outliers_orders_a, outliers_orders_b], axis=0)
-
-        outliers_revenue = self.orders.query('revenue > 28000')['visitorId']
-
-        anomalies = (pd.concat([outliers_orders, outliers_revenue], axis=0)
-                     .drop_duplicates().sort_values())
-
+        # Сформируем данные с выручкой с аномалиями
         revenue_a = self.orders.query('group =="A"')['revenue']
         revenue_b = self.orders.query('group =="B"')['revenue']
+        
+        # Выявим аномалии
+        anomalies = self.get_anomalies(orders_by_a, orders_by_b)
 
+        # Выборки с выручкой  без аномалий
         clean_revenue_a = self.orders.query(
             'group == "A" and visitorId not in @anomalies')['revenue']
         clean_revenue_b = self.orders.query(
             'group == "B" and visitorId not in @anomalies')['revenue']
 
+        # Выборки с заказами без аномалий
         cleaned_by_a = orders_by_a.query(
             'visitorId not in @anomalies')['orders']
         cleaned_by_b = orders_by_b.query(
             'visitorId not in @anomalies')['orders']
 
-        sample_clean_a = pd.concat(
-            [cleaned_by_a, self.get_placeholders(orders_by_a, 'A')])
-        sample_clean_b = pd.concat(
-            [cleaned_by_b, self.get_placeholders(orders_by_b, 'B')])
+        # Выборки с выручкой без аномалий
+        sample_clean_a = pd.concat([cleaned_by_a, placeholders_a])
+        sample_clean_b = pd.concat([cleaned_by_b, placeholders_b])
 
         prepared_data = {'sample_raw_a': sample_raw_a,
                          'sample_raw_b': sample_raw_b,
