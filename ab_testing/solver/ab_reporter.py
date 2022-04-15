@@ -12,6 +12,8 @@ class ABReporter:
         self.visitors = pd.read_csv(visitors, parse_dates=['date'])
         self.orders = pd.read_csv(orders, parse_dates=['date'])
         self.cumulated = None
+        self.cols = None
+        self.res_syr = None
 
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
@@ -21,6 +23,9 @@ class ABReporter:
         for dataset in datasets:
             dataset.columns = [name.lower().replace(' ', '_') for name
                                in dataset.columns.values]
+
+    def statistics_tests(self):
+        pass
 
     def cumulate_column(self, df, column):
         """Cуммируем элементы колонки с накоплением."""
@@ -32,7 +37,8 @@ class ABReporter:
 
     def grouped_summary(self):
         """Получаем сводную таблицу посетителей и заказов."""
-        columns = ['date', 'group', 'orders', 'buyers', 'revenue', 'visitors']
+        columns = {'transactionId': 'orders',
+                   'visitorId': 'buyers'}
         visitors = (self.visitors
                     .groupby(['date', 'group'], as_index=False)
                     .agg({'date': 'max',
@@ -47,15 +53,19 @@ class ABReporter:
                         'visitorId': 'nunique',
                         'revenue': 'sum'}, axis=1))
 
-        visitors['visitors'] = self.cumulate_column(visitors, 'visitors')
-        orders['revenue'] = self.cumulate_column(orders, 'revenue')
-        orders['transactionId'] = self.cumulate_column(orders, 'transactionId')
-        orders['visitorId'] = self.cumulate_column(orders, 'visitorId')
+        visitors['visitors_cm'] = self.cumulate_column(visitors,
+                                                             'visitors')
+        orders['revenue_cm'] = self.cumulate_column(orders, 'revenue')
+        orders['orders_cm'] = self.cumulate_column(orders,
+                                                               'transactionId')
+        orders['buyers_cm'] = self.cumulate_column(orders, 'visitorId')
 
         result = orders.merge(visitors)
-        result.columns = columns
+        # self.cols = result.columns 
+        # self.res_syr = result.copy()
+        result.rename(columns=columns, inplace=True)
 
-        result['conversion'] = result['orders'] / result['visitors']
+        result['conversion_cm'] = result['orders_cm'] / result['visitors_cm']
 
         self.cumulated = result
 
@@ -63,7 +73,7 @@ class ABReporter:
 
     def prepare_data_for_cm_plot(self):
         """Готовим данные для визуализации кумулятивных метрик."""
-        columns_to_pick = ['date', 'revenue', 'orders', 'conversion']
+        columns_to_pick = ['date', 'revenue_cm', 'orders_cm', 'conversion_cm']
         cumulated_copy = self.cumulated.copy()
         cumulated_copy['date'] = cumulated_copy['date'].dt.date
         revenue_a = cumulated_copy.query('group == "A"')[columns_to_pick]
@@ -71,17 +81,18 @@ class ABReporter:
         merged_revenues = revenue_a.merge(revenue_b,
                                           left_on='date', right_on='date',
                                           how='left', suffixes=['_a', '_b'])
-        mean_b_a_revenue_ratio = (((merged_revenues['revenue_b'] /
-                                    merged_revenues['orders_b']) /
-                                   (merged_revenues['revenue_a'] /
-                                    merged_revenues['orders_a']) - 1))
-        conversion_b_a_ratio = (merged_revenues['conversion_b'] /
-                                merged_revenues['conversion_a'] - 1)
+        mean_b_a_revenue_ratio = (((merged_revenues['revenue_cm_b'] /
+                                    merged_revenues['orders_cm_b']) /
+                                   (merged_revenues['revenue_cm_a'] /
+                                    merged_revenues['orders_cm_a']) - 1))
+        conversion_b_a_ratio = (merged_revenues['conversion_cm_b'] /
+                                merged_revenues['conversion_cm_a'] - 1)
 
         merged_revenues['mean_revenue_ratio'] = mean_b_a_revenue_ratio
         merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
         return revenue_a, revenue_b, merged_revenues
+        
 
     def plot_cumulative_metrics(self):
         """Функция для визуализации кумулятивных метрик."""
@@ -93,18 +104,18 @@ class ABReporter:
         ax1 = plt.subplot(2, 3, 1)
         ax1.set_xticks(revenue_a['date'][::7])
         ax1.set_xticklabels(revenue_a['date'][::7])
-        plt.plot(revenue_a['date'], revenue_a['revenue'], label='группа A')
-        plt.plot(revenue_b['date'], revenue_b['revenue'], label='группа B')
+        plt.plot(revenue_a['date'], revenue_a['revenue_cm'], label='группа A')
+        plt.plot(revenue_b['date'], revenue_b['revenue_cm'], label='группа B')
         plt.legend()
         plt.ylabel('Выручка')
         plt.xlabel('Лайфтайм')
         plt.title('Графики кумулятивной выручки по дням и группам')
 
         ax2 = plt.subplot(2, 3, 2, sharex=ax1)
-        plt.plot(revenue_a['date'], revenue_a['revenue'] /
-                 revenue_a['orders'], label='группа A')
-        plt.plot(revenue_b['date'], revenue_b['revenue'] /
-                 revenue_b['orders'], label='группа B')
+        plt.plot(revenue_a['date'], revenue_a['revenue_cm'] /
+                 revenue_a['orders_cm'], label='группа A')
+        plt.plot(revenue_b['date'], revenue_b['revenue_cm'] /
+                 revenue_b['orders_cm'], label='группа B')
         plt.legend()
         plt.ylabel('Средняя сумма чека')
         plt.xlabel('Лайфтайм')
@@ -119,8 +130,12 @@ class ABReporter:
         plt.title('График относительного различия для среднего чека')
 
         ax4 = plt.subplot(2, 3, 4, sharex=ax1)
-        plt.plot(revenue_a['date'], revenue_a['conversion'], label='группа A')
-        plt.plot(revenue_b['date'], revenue_b['conversion'], label='группа B')
+        plt.plot(revenue_a['date'],
+                 revenue_a['conversion_cm'],
+                 label='группа A')
+        plt.plot(revenue_b['date'],
+                 revenue_b['conversion_cm'],
+                 label='группа B')
         plt.legend()
         plt.ylabel('Конверсия')
         plt.xlabel('Лайфтайм')
