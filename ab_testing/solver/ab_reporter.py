@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 import seaborn as sns
+import scipy.stats as stats
 
 
 class ABReporter:
@@ -24,8 +25,97 @@ class ABReporter:
             dataset.columns = [name.lower().replace(' ', '_') for name
                                in dataset.columns.values]
 
-    def statistics_tests(self):
-        pass
+    def get_placeholders(self, data):
+        """Заполняем выборки нулями."""
+        full_length = self.cumulated.query('group == "A"')['visitors'].sum()
+        index = np.arange(full_length - len(data), name='orders')
+        placeholders = pd.Series(0, index=index)
+        return placeholders
+
+    def prepare_data_for_stat(self):
+        """Готовим данные для статистических тестов."""
+        orders_by_a = (self.orders.query('group == "A"')
+                                  .groupby('visitorId', as_index=False)
+                                  .agg({'transactionId': 'nunique'}))
+        orders_by_b = (self.orders.query('group == "B"')
+                                  .groupby('visitorId', as_index=False)
+                                  .agg({'transactionId': 'nunique'}))
+
+        sample_raw_a = pd.concat([orders_by_a['orders'],
+                                  self.get_placeholders(orders_by_a)], axis=0)
+        sample_raw_b = pd.concat([orders_by_b['orders'],
+                                  self.get_placeholders(orders_by_b)], axis=0)
+
+        outliers_orders_a = orders_by_a.query('orders > 2')['visitorId']
+        outliers_orders_b = orders_by_b.query('orders > 2')['visitorId']
+        outliers_orders = pd.concat(
+            [outliers_orders_a, outliers_orders_b], axis=0)
+
+        outliers_revenue = self.orders.query('revenue > 28000')['visitorId']
+
+        anomalies = (pd.concat([outliers_orders, outliers_revenue], axis=0)
+                     .drop_duplicates().sort_values())
+
+        revenue_a = self.orders.query('group =="A"')['revenue']
+        revenue_b = self.orders.query('group =="B"')['revenue']
+
+        clean_revenue_a = self.orders.query(
+            'group == "A" and visitorId not in @anomalies')['revenue']
+        clean_revenue_b = self.orders.query(
+            'group == "B" and visitorId not in @anomalies')['revenue']
+
+        cleaned_by_a = orders_by_a.query(
+            'visitorId not in @anomalies')['orders']
+        cleaned_by_b = orders_by_b.query(
+            'visitorId not in @anomalies')['orders']
+
+        sample_clean_a = pd.concat(
+            [cleaned_by_a, self.get_placeholders(orders_by_a)])
+        sample_clean_b = pd.concat(
+            [cleaned_by_b, self.get_placeholders(orders_by_b)])
+
+        prepared_data = {'sample_raw_a': sample_raw_a,
+                         'sample_raw_b': sample_raw_b,
+                         'revenue_a': revenue_a,
+                         'revenue_b': revenue_b,
+                         'clean_rev_a': clean_revenue_a,
+                         'clean_rev_b': clean_revenue_b,
+                         'sample_clean_a': sample_clean_a,
+                         'sample_clean_b': sample_clean_b}
+
+        return prepared_data
+
+    def mannwhitneyu(self):
+        result = []
+
+        # Подготовим данные
+        prepared_data = self.prepare_data_for_stat()
+
+        # Считаем статистическую значимость различий
+        # в конверсии между группами по «сырым» данным
+        raw_conv_result = stats.mannwhitneyu(prepared_data['sample_raw_a'],
+                                             prepared_data['sample_raw_b'])[1]
+        result.append(raw_conv_result)
+
+        # Считаем статистическую значимость различий
+        # в среднем чеке заказа между группами по «сырым» данным
+        raw_revenue_result = stats.mannwhitneyu(prepared_data['revenue_a'],
+                                                prepared_data['revenue_b'])[1]
+        result.append(raw_revenue_result)
+
+        # Считаем статистическую значимость различий
+        # в конверсии между группами по «очищенным» данным
+        clean_conv_result = stats.mannwhitneyu(
+            prepared_data['sample_clean_a'], prepared_data['sample_clean_b'])[1]
+        result.append(clean_conv_result)
+
+        # Считаем статистическую значимость различий
+        # в среднем чеке заказа между группами по «очищенным» данным
+        clean_rev_result = stats.mannwhitneyu(prepared_data['clean_rev_a'],
+                                              prepared_data['clean_rev_b'])[1]
+        result.append(clean_rev_result)
+
+        result = pd.DataFrame(result)
 
     def cumulate_column(self, df, column):
         """Cуммируем элементы колонки с накоплением."""
@@ -54,14 +144,14 @@ class ABReporter:
                         'revenue': 'sum'}, axis=1))
 
         visitors['visitors_cm'] = self.cumulate_column(visitors,
-                                                             'visitors')
+                                                       'visitors')
         orders['revenue_cm'] = self.cumulate_column(orders, 'revenue')
         orders['orders_cm'] = self.cumulate_column(orders,
-                                                               'transactionId')
+                                                   'transactionId')
         orders['buyers_cm'] = self.cumulate_column(orders, 'visitorId')
 
         result = orders.merge(visitors)
-        # self.cols = result.columns 
+        # self.cols = result.columns
         # self.res_syr = result.copy()
         result.rename(columns=columns, inplace=True)
 
@@ -92,7 +182,6 @@ class ABReporter:
         merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
         return revenue_a, revenue_b, merged_revenues
-        
 
     def plot_cumulative_metrics(self):
         """Функция для визуализации кумулятивных метрик."""
