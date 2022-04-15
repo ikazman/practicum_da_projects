@@ -139,6 +139,8 @@ class ABReporter:
         """Функция для гистограммы, диаграммы рассеивания и размаха."""
         plt.figure(figsize=(25, 5))
 
+        x_values = pd.Series(range(0, len(self.orders['revenue'])))
+
         ax1 = plt.subplot(1, 3, 1)
         sns.histplot(data=data, x=column)
         ax1.axvline(data[column].median(),
@@ -159,14 +161,15 @@ class ABReporter:
                     label='99%')
         plt.ylabel('Число пользователей')
         plt.xlabel('Сумма')
+        plt.legend()
         plt.title(f'{column_name}: распределение ')
 
         ax2 = plt.subplot(1, 3, 2)
         sns.scatterplot(ax=ax2, x=x_values, y=data[column], hue=data[column], size=data[column], sizes=(
             1, 200), linewidth=0, data=data)
         plt.legend()
-        plt.ylabel('Сумма выручки')
-        plt.xlabel('Пользователи')
+        plt.ylabel('Сумма')
+        plt.xlabel('Число заказов')
         plt.title(f'{column_name}: диаграмма рассеивания')
 
         ax3 = plt.subplot(1, 3, 3)
