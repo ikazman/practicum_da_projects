@@ -119,8 +119,8 @@ class ABReporter:
         plt.title('График относительного различия для среднего чека')
 
         ax4 = plt.subplot(2, 3, 4, sharex=ax1)
-        plt.plot(revenue_a['date'], revenue_a['conversion'], label='A')
-        plt.plot(revenue_b['date'], revenue_b['conversion'], label='B')
+        plt.plot(revenue_a['date'], revenue_a['conversion'], label='группа A')
+        plt.plot(revenue_b['date'], revenue_b['conversion'], label='группа B')
         plt.legend()
         plt.ylabel('Конверсия')
         plt.xlabel('Лайфтайм')
