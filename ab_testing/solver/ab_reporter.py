@@ -13,8 +13,6 @@ class ABReporter:
         self.visitors = pd.read_csv(visitors, parse_dates=['date'])
         self.orders = pd.read_csv(orders, parse_dates=['date'])
         self.cumulated = None
-        self.cols = None
-        self.res_syr = None
 
     def columns_fixer(self):
         """Приводим колонки к одному регистру, переименовываем по
