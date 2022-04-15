@@ -61,11 +61,8 @@ class ABReporter:
 
         return result
 
-    def plot_cumulative_metrics(self):
-        """Функция для визуализации кумулятивных метрик."""
-        plt.figure(figsize=(25, 10))
-        plt.style.use('seaborn-darkgrid')
-
+    def prepare_data_for_cm_plot(self):
+        """Готовим данные для визуализации кумулятивных метрик."""
         columns_to_pick = ['date', 'revenue', 'orders', 'conversion']
         cumulated_copy = self.cumulated.copy()
         cumulated_copy['date'] = cumulated_copy['date'].dt.date
@@ -84,7 +81,15 @@ class ABReporter:
         merged_revenues['mean_revenue_ratio'] = mean_b_a_revenue_ratio
         merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
-        # кривые удержания платящих пользователей
+        return revenue_a, revenue_b, merged_revenues
+
+    def plot_cumulative_metrics(self):
+        """Функция для визуализации кумулятивных метрик."""
+        plt.figure(figsize=(25, 10))
+        plt.style.use('seaborn-darkgrid')
+
+        revenue_a, revenue_b, merged_revenues = self.prepare_data_for_cm_plot()
+
         ax1 = plt.subplot(2, 3, 1)
         ax1.set_xticks(revenue_a['date'][::7])
         ax1.set_xticklabels(revenue_a['date'][::7])
