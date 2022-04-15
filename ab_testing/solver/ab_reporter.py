@@ -73,7 +73,7 @@ class ABReporter:
                                           how='left', suffixes=['_a', '_b'])
         mean_b_a_revenue_ratio = (((merged_revenues['revenue_b'] /
                                     merged_revenues['orders_b']) /
-                                    (merged_revenues['revenue_a'] /
+                                   (merged_revenues['revenue_a'] /
                                     merged_revenues['orders_a']) - 1))
         conversion_b_a_ratio = (merged_revenues['conversion_b'] /
                                 merged_revenues['conversion_a'] - 1)
@@ -118,7 +118,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('График относительного различия для среднего чека')
 
-        ax4=plt.subplot(2, 3, 4, sharex=ax1)
+        ax4 = plt.subplot(2, 3, 4, sharex=ax1)
         plt.plot(revenue_a['date'], revenue_a['conversion'], label='A')
         plt.plot(revenue_b['date'], revenue_b['conversion'], label='B')
         plt.legend()
@@ -126,11 +126,52 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('График кумулятивной конверсии')
 
-        ax5=plt.subplot(2, 3, 5, sharex=ax1)
+        ax5 = plt.subplot(2, 3, 5, sharex=ax1)
         plt.plot(merged_revenues['date'], merged_revenues['conversion_b_a'])
         plt.axhline(y=0, color='black', linestyle='--')
         plt.axhline(y=-0.1, color='grey', linestyle='--')
         plt.title('Относительный прирост конверсии группы '
                   'B относительно группы A')
+        plt.tight_layout()
+        plt.show()
+
+    def plotter(self, data, column, column_name):
+        """Функция для гистограммы, диаграммы рассеивания и размаха."""
+        plt.figure(figsize=(25, 5))
+
+        ax1 = plt.subplot(1, 3, 1)
+        sns.histplot(data=data, x=column)
+        ax1.axvline(data[column].median(),
+                    linestyle='--',
+                    color='#FF1493',
+                    label='median')
+        ax1.axvline(data[column].mean(),
+                    linestyle='--',
+                    color='orange',
+                    label='mean')
+        ax1.axvline(data[column].quantile(0.1),
+                    linestyle='--',
+                    color='yellow',
+                    label='1%')
+        ax1.axvline(data[column].quantile(0.99),
+                    linestyle='--',
+                    color='yellow',
+                    label='99%')
+        plt.ylabel('Число пользователей')
+        plt.xlabel('Сумма')
+        plt.title(f'{column_name}: распределение ')
+
+        ax2 = plt.subplot(1, 3, 2)
+        sns.scatterplot(ax=ax2, x=x_values, y=data[column], hue=data[column], size=data[column], sizes=(
+            1, 200), linewidth=0, data=data)
+        plt.legend()
+        plt.ylabel('Сумма выручки')
+        plt.xlabel('Пользователи')
+        plt.title(f'{column_name}: диаграмма рассеивания')
+
+        ax3 = plt.subplot(1, 3, 3)
+        sns.boxplot(x=data[column])
+        plt.xlabel(f'{column_name}')
+        plt.title(f'{column_name}: диаграмма размаха')
         plt.tight_layout()
         plt.show()
