@@ -160,7 +160,8 @@ class MannWhitneyU():
                        clean_rev_result))
 
         result = pd.DataFrame(result)
-        result.columns = ['Выборка', 'Н0', 'Н1', 'alpha', 'p-value']
+        result.columns = ['Выборка', 'Нулевая гипотеза (Н0)',
+                          'Альтернативная гипотеза (Н1)', 'alpha', 'p-value']
         result['p-value < alpha'] = result['p-value'] < result['alpha']
         result['Н0/Н1'] = result.apply(self.hypo_check, axis=1)
 
