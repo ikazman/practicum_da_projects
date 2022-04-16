@@ -106,34 +106,61 @@ class MannWhitneyU():
         # Считаем статистическую значимость различий
         # в конверсии между группами по «сырым» данным
         alpha = 0.05
-        zero_hypothesis = 'D '
-
+        zero_hypothesis = 'В конверсии между группами нет различий'
+        alt_hypothesis = 'В конверсии между группами есть различия'
 
         raw_conv_result = stats.mannwhitneyu(prepared_data['sample_raw_a'],
                                              prepared_data['sample_raw_b'])[1]
-        result.append(('Конверсия по сырым', raw_conv_result))
+        result.append(('Конверсия по сырым',
+                       zero_hypothesis,
+                       alt_hypothesis,
+                       alpha,
+                       raw_conv_result))
 
         # Считаем статистическую значимость различий
         # в среднем чеке заказа между группами по «сырым» данным
+        alpha = 0.05
+        zero_hypothesis = 'Отличий в среднем чеке между группами нет'
+        alt_hypothesis = 'Отличия в среднем чеке между группами есть'
+
         raw_revenue_result = stats.mannwhitneyu(prepared_data['revenue_a'],
                                                 prepared_data['revenue_b'])[1]
-        result.append(('Средний чек по сырым', raw_revenue_result))
+        result.append(('Средний чек по сырым',
+                       zero_hypothesis,
+                       alt_hypothesis,
+                       alpha,
+                       raw_revenue_result))
 
         # Считаем статистическую значимость различий
         # в конверсии между группами по «очищенным» данным
+        alpha = 0.05
+        zero_hypothesis = 'В конверсии между группами нет различий'
+        alt_hypothesis = 'В конверсии между группами есть различия'
+
         clean_conv_result = stats.mannwhitneyu(
             prepared_data['sample_clean_a'], prepared_data['sample_clean_b'])[1]
-        result.append(('Конверсия по очищенным', clean_conv_result))
+        result.append(('Конверсия по очищенным',
+                       zero_hypothesis,
+                       alt_hypothesis,
+                       alpha,
+                       clean_conv_result))
 
         # Считаем статистическую значимость различий
         # в среднем чеке заказа между группами по «очищенным» данным
+        alpha = 0.05
+        zero_hypothesis = 'Отличий в среднем чеке между группами нет'
+        alt_hypothesis = 'Отличия в среднем чеке между группами есть'
+
         clean_rev_result = stats.mannwhitneyu(prepared_data['clean_rev_a'],
                                               prepared_data['clean_rev_b'])[1]
-        result.append(('Средний чек по очищенным', clean_rev_result))
+        result.append(('Средний чек по очищенным',
+                       zero_hypothesis,
+                       alt_hypothesis,
+                       alpha,
+                       clean_rev_result))
 
         result = pd.DataFrame(result)
-        result.columns = ['Выборка', 'p-value']
-        result['alpha'] = 0.05
+        result.columns = ['Выборка', 'Н0', 'Н1', 'alpha', 'p-value']
         result['p-value < alpha'] = result['p-value'] < result['alpha']
         result['Н0/Н1'] = result.apply(self.hypo_check, axis=1)
 
