@@ -1,8 +1,14 @@
 import pandas as pd
-from ab_reporter import ABReporter
+import numpy as np
+import scipy.stats as stats
 
 
-class MannWhitneyU(ABReporter):
+class MannWhitneyU():
+
+    def __init__(self, visitors, orders, cumulated):
+        self.visitors = visitors
+        self.orders = orders
+        self.cumulated = cumulated
 
     def get_anomalies(self, orders_by_a, orders_by_b):
         """Получаем данные с аномалиями."""
@@ -99,6 +105,10 @@ class MannWhitneyU(ABReporter):
 
         # Считаем статистическую значимость различий
         # в конверсии между группами по «сырым» данным
+        alpha = 0.05
+        zero_hypothesis = 'D '
+
+
         raw_conv_result = stats.mannwhitneyu(prepared_data['sample_raw_a'],
                                              prepared_data['sample_raw_b'])[1]
         result.append(('Конверсия по сырым', raw_conv_result))
@@ -122,7 +132,7 @@ class MannWhitneyU(ABReporter):
         result.append(('Средний чек по очищенным', clean_rev_result))
 
         result = pd.DataFrame(result)
-        result.columns = ['Гипотеза', 'p-value']
+        result.columns = ['Выборка', 'p-value']
         result['alpha'] = 0.05
         result['p-value < alpha'] = result['p-value'] < result['alpha']
         result['Н0/Н1'] = result.apply(self.hypo_check, axis=1)
