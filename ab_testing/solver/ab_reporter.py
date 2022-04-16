@@ -40,7 +40,7 @@ class ABReporter:
                      .drop_duplicates().sort_values())
 
         return anomalies
-    
+
     def get_placeholders(self, data, group):
         """Заполняем выборки нулями."""
         full_length = self.cumulated.query(f'group == "{group}"')['visitors']
@@ -74,7 +74,7 @@ class ABReporter:
         # Сформируем данные с выручкой с аномалиями
         revenue_a = self.orders.query('group =="A"')['revenue']
         revenue_b = self.orders.query('group =="B"')['revenue']
-        
+
         # Выявим аномалии
         anomalies = self.get_anomalies(orders_by_a, orders_by_b)
 
@@ -300,8 +300,9 @@ class ABReporter:
         plt.title(f'{column_name}: распределение ')
 
         ax2 = plt.subplot(1, 3, 2)
-        sns.scatterplot(ax=ax2, x=x_values, y=data[column], hue=data[column], size=data[column], sizes=(
-            1, 200), linewidth=0, data=data)
+        sns.scatterplot(ax=ax2, x=x_values, y=data[column],
+                        hue=data[column], size=data[column],
+                        sizes=(1, 200), linewidth=0, data=data)
         plt.legend()
         plt.ylabel('Сумма')
         plt.xlabel('Число заказов')
