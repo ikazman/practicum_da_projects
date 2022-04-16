@@ -93,11 +93,14 @@ class MannWhitneyU():
         return prepared_data
 
     def hypo_check(self, row):
+        """Функуия для закопления колонки сведениями о принятой или 
+        отвергнутой гипотезе."""
         if row['p-value < alpha']:
             return 'Н1'
         return 'Н0'
 
     def mannwhitneyu(self):
+        """Проводим статистические тесты, собираем результат."""
         result = []
 
         # Подготовим данные
