@@ -2,6 +2,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+
 class ABReporter:
     """Создаем профили пользователя, расчитываем и визуализируем метрики."""
 
@@ -118,6 +119,7 @@ class ABReporter:
         plt.plot(revenue_b['date'],
                  revenue_b['conversion_cm'],
                  label='группа B')
+        ax4.set_ylim(0, revenue_a['conversion_cm'].max() + 0.01)
         plt.legend()
         plt.ylabel('Конверсия')
         plt.xlabel('Лайфтайм')
@@ -126,9 +128,12 @@ class ABReporter:
         ax5 = plt.subplot(2, 3, 5, sharex=ax1)
         plt.plot(merged_revenues['date'], merged_revenues['conversion_b_a'])
         plt.axhline(y=0, color='black', linestyle='--')
-        plt.axhline(y=-0.1, color='grey', linestyle='--')
+        plt.axhline(y=merged_revenues['conversion_b_a'].mean(),
+                    color='grey', linestyle='--',
+                    label='Среднее отношение конверсии')
         plt.title('Относительный прирост конверсии группы '
                   'B относительно группы A')
+        plt.legend()
         plt.tight_layout()
         plt.show()
 
