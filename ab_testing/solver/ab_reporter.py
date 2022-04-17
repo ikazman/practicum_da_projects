@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -10,6 +11,19 @@ class ABReporter:
         self.visitors = pd.read_csv(visitors, parse_dates=['date'])
         self.orders = pd.read_csv(orders, parse_dates=['date'])
         self.cumulated = None
+
+    def groups_intersected(self):
+        """Проверяем, что пользователи из групп изолированы."""
+
+        # отбираем группы из данных с заказами
+        group_a = self.orders.query('group == "A"')
+        group_b = self.orders.query('group == "B"')
+
+        # получаем пользователей, попавших в обе группы
+        group_intersections = pd.Series(np.intersect1d(group_a['visitorId'],
+                                                       group_b['visitorId']))
+
+        return group_intersections
 
     def cumulate_column(self, df, column):
         """Cуммируем элементы колонки с накоплением."""
@@ -81,7 +95,7 @@ class ABReporter:
                                           how='left', suffixes=['_a', '_b'])
 
         # посчитаем отношение кумулятивных выручки
-        # и конверсии каждой из групп                                
+        # и конверсии каждой из групп
         mean_b_a_revenue_ratio = (((merged_revenues['revenue_cm_b'] /
                                     merged_revenues['orders_cm_b']) /
                                    (merged_revenues['revenue_cm_a'] /
@@ -89,7 +103,7 @@ class ABReporter:
         conversion_b_a_ratio = (merged_revenues['conversion_cm_b'] /
                                 merged_revenues['conversion_cm_a'] - 1)
 
-        # дополним объединенную таблицу посчитанными отношениями                 
+        # дополним объединенную таблицу посчитанными отношениями
         merged_revenues['mean_revenue_ratio'] = mean_b_a_revenue_ratio
         merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
@@ -100,10 +114,10 @@ class ABReporter:
         plt.figure(figsize=(25, 10))
         plt.style.use('seaborn-darkgrid')
 
-        # получаем данные для визуализации: по группам и объединенные   
+        # получаем данные для визуализации: по группам и объединенные
         revenue_a, revenue_b, merged_revenues = self.prepare_data_for_cm_plot()
 
-        # Графики кумулятивной выручки по дням и группам  
+        # Графики кумулятивной выручки по дням и группам
         ax1 = plt.subplot(2, 3, 1)
         ax1.set_xticks(revenue_a['date'][::7])
         ax1.set_xticklabels(revenue_a['date'][::7])
@@ -114,7 +128,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('Графики кумулятивной выручки по дням и группам')
 
-        # Графики среднего чека по группам 
+        # Графики среднего чека по группам
         ax2 = plt.subplot(2, 3, 2, sharex=ax1)
         plt.plot(revenue_a['date'], revenue_a['revenue_cm'] /
                  revenue_a['orders_cm'], label='группа A')
