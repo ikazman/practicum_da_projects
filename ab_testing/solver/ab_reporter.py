@@ -23,6 +23,8 @@ class ABReporter:
         """Получаем сводную таблицу посетителей и заказов."""
         columns = {'transactionId': 'orders',
                    'visitorId': 'buyers'}
+
+        # сгруппируем данные о посетителях и заказах по дням и группам
         visitors = (self.visitors
                     .groupby(['date', 'group'], as_index=False)
                     .agg({'date': 'max',
@@ -37,6 +39,7 @@ class ABReporter:
                         'visitorId': 'nunique',
                         'revenue': 'sum'}, axis=1))
 
+        # посчитаем кумулятивные метрики для заказов и посетителей
         visitors['visitors_cm'] = self.cumulate_column(visitors,
                                                        'visitors')
         orders['revenue_cm'] = self.cumulate_column(orders, 'revenue')
@@ -44,25 +47,41 @@ class ABReporter:
                                                    'transactionId')
         orders['buyers_cm'] = self.cumulate_column(orders, 'visitorId')
 
+        # объединим данные о заказах и посетителях
         result = orders.merge(visitors)
         result.rename(columns=columns, inplace=True)
 
+        # посчитаем кумулятивную коверсию на объединенных данных
         result['conversion_cm'] = result['orders_cm'] / result['visitors_cm']
 
+        # сохраним результат
         self.cumulated = result
 
         return result
 
     def prepare_data_for_cm_plot(self):
         """Готовим данные для визуализации кумулятивных метрик."""
+
+        # определим колонки, которые будем отбирать для визулизации
         columns_to_pick = ['date', 'revenue_cm', 'orders_cm', 'conversion_cm']
+
+        # скопируем данные с кумулятивными метриками
+        # и приведем даты к нужному формату
         cumulated_copy = self.cumulated.copy()
         cumulated_copy['date'] = cumulated_copy['date'].dt.date
+
+        # сделаем срез по группам из кумулятивных метрик
         revenue_a = cumulated_copy.query('group == "A"')[columns_to_pick]
         revenue_b = cumulated_copy.query('group == "B"')[columns_to_pick]
+
+        # объединим данные так, чтобы данные каждой
+        # из групп получили отельную колонку
         merged_revenues = revenue_a.merge(revenue_b,
                                           left_on='date', right_on='date',
                                           how='left', suffixes=['_a', '_b'])
+
+        # посчитаем отношение кумулятивных выручки
+        # и конверсии каждой из групп                                
         mean_b_a_revenue_ratio = (((merged_revenues['revenue_cm_b'] /
                                     merged_revenues['orders_cm_b']) /
                                    (merged_revenues['revenue_cm_a'] /
@@ -70,6 +89,7 @@ class ABReporter:
         conversion_b_a_ratio = (merged_revenues['conversion_cm_b'] /
                                 merged_revenues['conversion_cm_a'] - 1)
 
+        # дополним объединенную таблицу посчитанными отношениями                 
         merged_revenues['mean_revenue_ratio'] = mean_b_a_revenue_ratio
         merged_revenues['conversion_b_a'] = conversion_b_a_ratio
 
@@ -80,8 +100,10 @@ class ABReporter:
         plt.figure(figsize=(25, 10))
         plt.style.use('seaborn-darkgrid')
 
+        # получаем данные для визуализации: по группам и объединенные   
         revenue_a, revenue_b, merged_revenues = self.prepare_data_for_cm_plot()
 
+        # Графики кумулятивной выручки по дням и группам  
         ax1 = plt.subplot(2, 3, 1)
         ax1.set_xticks(revenue_a['date'][::7])
         ax1.set_xticklabels(revenue_a['date'][::7])
@@ -92,6 +114,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('Графики кумулятивной выручки по дням и группам')
 
+        # Графики среднего чека по группам 
         ax2 = plt.subplot(2, 3, 2, sharex=ax1)
         plt.plot(revenue_a['date'], revenue_a['revenue_cm'] /
                  revenue_a['orders_cm'], label='группа A')
@@ -102,6 +125,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('Графики среднего чека по группам')
 
+        # График относительного различия для среднего чека
         ax3 = plt.subplot(2, 3, 3, sharex=ax1)
         plt.plot(merged_revenues['date'],
                  merged_revenues['mean_revenue_ratio'])
@@ -110,6 +134,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('График относительного различия для среднего чека')
 
+        # График кумулятивной конверсии
         ax4 = plt.subplot(2, 3, 4, sharex=ax1)
         plt.plot(revenue_a['date'],
                  revenue_a['conversion_cm'],
@@ -123,6 +148,7 @@ class ABReporter:
         plt.xlabel('Лайфтайм')
         plt.title('График кумулятивной конверсии')
 
+        # Относительный прирост конверсии группы B относительно группы A
         ax5 = plt.subplot(2, 3, 5, sharex=ax1)
         plt.plot(merged_revenues['date'], merged_revenues['conversion_b_a'])
         plt.axhline(y=0, color='black', linestyle='--')
@@ -141,6 +167,7 @@ class ABReporter:
 
         x_values = pd.Series(range(0, len(self.orders['revenue'])))
 
+        # Строим гистограмму
         ax1 = plt.subplot(1, 3, 1)
         sns.histplot(data=data, x=column)
         ax1.axvline(data[column].median(),
@@ -164,6 +191,7 @@ class ABReporter:
         plt.legend()
         plt.title(f'{column_name}: распределение ')
 
+        # Строим диаграмму рассеивания
         ax2 = plt.subplot(1, 3, 2)
         sns.scatterplot(ax=ax2, x=x_values, y=data[column],
                         hue=data[column], size=data[column],
@@ -173,6 +201,7 @@ class ABReporter:
         plt.xlabel('Число заказов')
         plt.title(f'{column_name}: диаграмма рассеивания')
 
+        # Строим диаграмму размаха
         ax3 = plt.subplot(1, 3, 3)
         sns.boxplot(x=data[column])
         plt.xlabel(f'{column_name}')
