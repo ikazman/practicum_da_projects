@@ -45,8 +45,6 @@ class ABReporter:
         orders['buyers_cm'] = self.cumulate_column(orders, 'visitorId')
 
         result = orders.merge(visitors)
-        # self.cols = result.columns
-        # self.res_syr = result.copy()
         result.rename(columns=columns, inplace=True)
 
         result['conversion_cm'] = result['orders_cm'] / result['visitors_cm']
