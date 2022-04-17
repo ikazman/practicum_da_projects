@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from pure_eval import group_expressions
 import seaborn as sns
 
 
@@ -12,7 +13,7 @@ class ABReporter:
         self.orders = pd.read_csv(orders, parse_dates=['date'])
         self.cumulated = None
 
-    def groups_intersected(self):
+    def get_intersections(self):
         """Проверяем, что пользователи из групп изолированы."""
 
         # отбираем группы из данных с заказами
@@ -20,8 +21,8 @@ class ABReporter:
         group_b = self.orders.query('group == "B"')
 
         # получаем пользователей, попавших в обе группы
-        group_intersections = pd.Series(np.intersect1d(group_a['visitorId'],
-                                                       group_b['visitorId']))
+        group_intersections = list(np.intersect1d(group_a['visitorId'],
+                                                  group_b['visitorId']))
 
         return group_intersections
 
@@ -33,10 +34,14 @@ class ABReporter:
         cumulated.sort_values(by='index', inplace=True)
         return cumulated.set_index('index')
 
-    def grouped_summary(self):
+    def grouped_summary(self, check_intersections=False):
         """Получаем сводную таблицу посетителей и заказов."""
         columns = {'transactionId': 'orders',
                    'visitorId': 'buyers'}
+
+        if check_intersections:
+            intersected = self.get_intersections()
+            self.orders = self.orders.query('visitorId not in @intersected')
 
         # сгруппируем данные о посетителях и заказах по дням и группам
         visitors = (self.visitors
