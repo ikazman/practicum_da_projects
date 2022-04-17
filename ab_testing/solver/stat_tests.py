@@ -5,22 +5,30 @@ import scipy.stats as stats
 
 class MannWhitneyU():
 
-    def __init__(self, visitors, orders, cumulated):
+    def __init__(self, visitors, orders, cumulated, orders_limit, rev_limit):
         self.visitors = visitors
         self.orders = orders
         self.cumulated = cumulated
+        self.orders_limit = orders_limit
+        self.revenue_limit = rev_limit
 
     def get_anomalies(self, orders_by_a, orders_by_b):
         """Получаем данные с аномалиями."""
 
         # Отберем выбросы по заказам
-        outliers_orders_a = orders_by_a.query('orders > 2')['visitorId']
-        outliers_orders_b = orders_by_b.query('orders > 2')['visitorId']
+        outliers_orders_a = (orders_by_a
+                             .query(f'orders > {self.orders_limit}')
+                             ['visitorId'])
+        outliers_orders_b = (orders_by_b
+                             .query(f'orders > {self.orders_limit}')
+                             ['visitorId'])
         outliers_orders = pd.concat([outliers_orders_a,
                                      outliers_orders_b], axis=0)
 
         # Отберем выбросы по выручке
-        outliers_revenue = self.orders.query('revenue > 28000')['visitorId']
+        outliers_revenue = (self.orders
+                            .query(f'revenue > {self.revenue_limit}')
+                            ['visitorId'])
 
         # Объединим выбросы
         anomalies = (pd.concat([outliers_orders, outliers_revenue], axis=0)
