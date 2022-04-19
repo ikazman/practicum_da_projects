@@ -48,7 +48,7 @@ class BayesianTesting(MannWhitneyU):
         result = pd.DataFrame(result)
         result.columns = ['Выборка', 'группа А (%)',
                           'группа В (%)']
-        result['группа А'] = round(result['группа А (%)'] * 100, 2)
-        result['группа В'] = round(result['группа В (%)'] * 100, 2)
+        result['группа А (%)'] = round(result['группа А (%)'] * 100, 2)
+        result['группа В (%)'] = round(result['группа В (%)'] * 100, 2)
 
         return result
