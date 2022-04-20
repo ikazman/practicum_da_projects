@@ -46,9 +46,12 @@ class BayesianTesting(MannWhitneyU):
         result = self.bayesian_tests(prepared_data, data_samples)
 
         result = pd.DataFrame(result)
-        result.columns = ['Выборка', 'группа А (%)',
-                          'группа В (%)']
-        result['группа А (%)'] = round(result['группа А (%)'] * 100, 2)
-        result['группа В (%)'] = round(result['группа В (%)'] * 100, 2)
+        result.columns = ['Выборка',
+                          'Вероятность, что лучше А (%)',
+                          'Вероятность, что лучше В (%)']
+        result['Вероятность, что лучше А (%)'] = round(
+            result['Вероятность, что лучше А (%)'] * 100, 2)
+        result['Вероятность, что лучше В (%)'] = round(
+            result['Вероятность, что лучше В (%)'] * 100, 2)
 
         return result
