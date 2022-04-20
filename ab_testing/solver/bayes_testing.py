@@ -9,14 +9,14 @@ class BayesianTesting(MannWhitneyU):
     def bayesian_tests(self, data, data_samples):
         """Подсчитываем вероятность быть лучшей."""
         result = []
-        
-        # инициализируем тест
-        test = DeltaLognormalDataTest()
 
         for sample in data_samples:
             sample_title = sample[0]
             group_a = data[sample[1]]
             group_b = data[sample[2]]
+
+            # инициализируем тест
+            test = DeltaLognormalDataTest()
 
             # добавляем варианты для тестирования
             test.add_variant_data('A', group_a, replace=True)
