@@ -8,7 +8,6 @@ _Примечание: датасеты, использованные в про�
 
 - [Маркетинговый анализ](https://github.com/ikazman/practicum_da_projects/blob/main/marketing_analysis/maketing_analysis.ipynb): расчет LTV, ROI, удержание и конверсия, выявление аномалий.
 - [А/В-тестирование](https://github.com/ikazman/practicum_da_projects/blob/main/ab_testing/ab_testing.ipynb): приоритизация гипотез, анализ результатов A/B-теста.
-<br></br>
-- [Исследование рынка](https://github.com/ikazman/practicum_da_projects/blob/main/market_research/market_research.ipynb)
+- [Исследование рынка](https://github.com/ikazman/practicum_da_projects/blob/main/market_research/market_research.ipynb): исследование данных, проверка гипотез, подготовка презентации по итогам исследования.
 <br></br>
 	_Инструменты: Numpy, Pandas, Seaborn, Matplotlib_
