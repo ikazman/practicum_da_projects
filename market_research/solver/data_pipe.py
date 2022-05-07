@@ -79,22 +79,15 @@ def bootstrap(data, n_sample=500, n_trials=10000):
 
     # зафиксируем случайные числа
     np.random.seed(42)
-
     result = []
-
     # определим размер подвыборки
     n_sample = min(len(data), n_sample)
-
     # инициализируем цикл попыток
     for _ in range(n_trials):
-
         # делаем подвыборку размера n_sample
         subsample = np.random.choice(data, size=(n_sample,))
-
         # рассчитываем статистику: среднее
         stat = subsample.mean()
-
         # добавлям статистику в результат
         result.append(stat)
-
     return pd.Series(result)
