@@ -10,4 +10,4 @@ _Примечание: датасеты, использованные в про�
 - [А/В-тестирование](https://github.com/ikazman/practicum_da_projects/blob/main/ab_testing/ab_testing.ipynb): приоритизация гипотез, анализ результатов A/B-теста.
 - [Исследование рынка](https://github.com/ikazman/practicum_da_projects/blob/main/market_research/market_research.ipynb): исследование данных, проверка гипотез, подготовка презентации по итогам исследования.
 <br></br>
-	_Инструменты: Numpy, Pandas, Seaborn, Matplotlib_
+	_Инструменты: Numpy, Pandas, SciPy, Seaborn, Matplotlib_
