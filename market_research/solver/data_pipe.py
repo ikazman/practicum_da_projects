@@ -76,6 +76,7 @@ def simple_grouper(data, grouper, agg_dict={'id': 'count'}):
 
 
 def bootstrap(data, n_sample=500, n_trials=10000):
+    """Ресемплируем данные."""
 
     # зафиксируем случайные числа
     np.random.seed(42)
