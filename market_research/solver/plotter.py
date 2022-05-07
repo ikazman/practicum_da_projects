@@ -48,7 +48,8 @@ class Picasso:
         x_values = pd.Series(range(0, len(data)))
         sns.scatterplot(ax=ax2, x=x_values, y=data[column],
                         hue=data[column], size=data[column],
-                        sizes=(1, 200), linewidth=0, data=data, palette='viridis')
+                        sizes=(1, 200), linewidth=0,
+                        data=data, palette='viridis')
         ax2.axhline(data[column].mean(),
                     linestyle='--',
                     color='orange',
@@ -76,8 +77,6 @@ class Picasso:
 
         plt.tight_layout()
         plt.show()
-
-        plt.tight_layout()
 
     def pie_chart_categories(df, column, desc=''):
         """Круговая диаграмма."""
