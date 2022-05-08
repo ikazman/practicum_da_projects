@@ -102,8 +102,8 @@ class NormalityCheck:
         return result
 
 
-class Wilcoxon:
-    """Применен непараметрический статистический критерий 
+class Wilcoxon(NormalityCheck):
+    """Применяем непараметрический статистический критерий 
     Уилкоксона для проверки гипотезы."""
 
     def __init__(self, chained, not_chained, full_data, num_limit):
@@ -111,13 +111,6 @@ class Wilcoxon:
         self.not_chained = not_chained
         self.cumulated = full_data
         self.num_limit = num_limit
-
-    def hypo_check(self, row):
-        """Функуия для закопления колонки сведениями о принятой или 
-        отвергнутой гипотезе."""
-        if row['p-value < alpha']:
-            return 'Н1'
-        return 'Н0'
 
     def get_anomalies(self, chained, not_chained):
         """Получаем данные с аномалиями."""
