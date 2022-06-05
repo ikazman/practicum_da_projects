@@ -101,3 +101,47 @@ class DataReader:
         self.group_and_event_values_fixer()
 
         return self.data
+
+
+def simple_grouper(data, grouper, agg_dict={'id': 'count'}):
+    """Группируем данные, считаем процентное отношение."""
+    data = data.groupby(grouper).agg(agg_dict).reset_index()
+    if 'id' in agg_dict.keys():
+        data['percent'] = round(data['id'] * 100 / data['id'].sum(), 2)
+        data = data.sort_values(by='id', ascending=False)
+    return data
+
+
+def get_profiles(data):
+    """Cоздаем пользовательские профили."""
+
+    # Находим параметры первых посещений
+    profiles = (data
+                .sort_values(by=['id', 'date'])
+                .groupby('id').agg({'timestamp': 'first',
+                                    'date': 'first',
+                                    'group': 'first'})
+                .rename(columns={'date': 'first_ts'})
+                .reset_index())
+
+    # Для когортного анализа определяем дату первого посещения
+    # и первый день месяца, в который это посещение произошло
+    profiles['dt'] = profiles['timestamp'].dt.date
+    profiles['month'] = profiles['timestamp'].astype('datetime64[M]')
+
+    # Добавим в профиль сведения о последнем событии для каждого пользователя
+    last_event = (data.groupby(['id', 'event', 'date'])
+                  .last()
+                  .reset_index()
+                  .drop_duplicates(subset=['id'], keep='last')
+                  [['id', 'event']])
+    last_event.columns = ['id', 'last_event']
+    profiles = profiles.merge(last_event)
+
+    # Отбираем заплативших пользователей
+    orders = data.query('event == "payment"')
+
+    # Добавляем признак платящих пользователей
+    profiles['payer'] = profiles['id'].isin(orders['id'].unique())
+
+    return profiles
