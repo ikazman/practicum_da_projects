@@ -47,3 +47,33 @@ def histogram(data, bins='rice', labels=None, stats=False):
     plt.ylabel('Число наблюдений')
     plt.title(labels['title'], loc='left', pad=30,
               fontsize=12, fontweight='bold')
+
+
+def funnel_plot(data, groups_labels=None, x='id', y='event',
+                title='', *args, **kwargs):
+    """Строим вороноку."""
+
+    fig = go.Figure()
+
+    # Если переданы маркеры групп
+    if groups_labels:
+        for group in groups_labels:
+            sample = data.query(f'group == "{group}"')
+            fig.add_trace(go.Funnel(
+                name=group,
+                y=sample[y],
+                x=sample[x], *args, **kwargs))
+
+    else:  # Строим по всем данным
+        fig.add_trace(go.Funnel(name='Все пользователи',
+                                y=data[y],
+                                x=data[x], *args, **kwargs))
+
+    # Изменим размер, фон, добавим заголовок
+    fig.update_layout(autosize=False,
+                      width=700,
+                      height=500,
+                      paper_bgcolor='rgba(0,0,0,0)',
+                      plot_bgcolor='rgba(0,0,0,0)',
+                      title=title)
+    fig.show()
