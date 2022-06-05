@@ -130,3 +130,6 @@ dmypy.json
 
 # Datasets
 *.csv
+
+# iframe_figures
+*/iframe_figures
