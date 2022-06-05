@@ -1,3 +1,9 @@
+import numpy as np
+import pandas as pd
+from scipy.stats import shapiro
+from statsmodels.stats.proportion import proportions_ztest
+
+
 class StatTest:
     """Класс для проведения статистических тестов и сборов результатов."""
 
@@ -31,7 +37,8 @@ class StatTest:
         order = self.data.drop_duplicates('event')[['event']]
         order = order.query('event != "tutorial"').reset_index()
 
-        # Сгруппируем логи по событиям и группам, посчитаем уникальных пользователей
+        # Сгруппируем логи по событиям и группам,
+        # посчитаем уникальных пользователей
         groups = self.data.groupby(['event', 'group']).agg(
             {'id': 'nunique'}).reset_index()
 
@@ -44,8 +51,10 @@ class StatTest:
             row = groups.group == f'{group_marker}'
 
             # Считаем число пользователей на предыдущем шаге
-            groups.loc[row, 'prev'] = (groups.query(f'group == "{group_marker}"').id +
-                                       abs(groups.query(f'group == "{group_marker}"').id.diff()))
+            groups.loc[row, 'prev'] = (
+                groups.query(f'group == "{group_marker}"').id +
+                abs(groups.query(f'group == "{group_marker}"').id.diff())
+            )
 
         for i in groups.group.unique():
             sum_of = int(self.groups_total.query(f'group == "{i}"')['id'])
@@ -129,7 +138,8 @@ class StatTest:
 
         self.result = self.result.append(row, ignore_index=True)
 
-    def test_routine(self, groups_labels, sample_name, united=False):
+    def test_routine(self, params_of_test, groups_labels,
+                     sample_name, united=False):
         """Проводим множественные тесты."""
         for event in list(self.agg_groups.event.unique()):
             # Делаем выборки
@@ -138,7 +148,7 @@ class StatTest:
             params_of_test['samples'] = [*groups_to_test]
             # Передаем имя
             params_of_test['sample_name'] = f'{sample_name}: {event}'
-            tests.test_designer(params_of_test)
+            self.test_designer(params_of_test)
 
 
 def report_styler(report):
